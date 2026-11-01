@@ -19,6 +19,7 @@ type AuthContextValue = {
   loading: boolean;
   requestDemoCode: (phone: string) => Promise<string>;
   verifyDemoCode: (phone: string, code: string) => Promise<void>;
+  registerDemoAccount: (phone: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -68,6 +69,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     },
     async verifyDemoCode(phone, code) {
       const result = await apiRequest<{ user: DemoUser; sessionToken: string }>('/api/auth/demo/verify-code', {
+        method: 'POST',
+        body: JSON.stringify({ phone, code }),
+      }, false);
+      storeDemoSession({ sessionToken: result.sessionToken, user: result.user });
+      setUser(result.user);
+    },
+    async registerDemoAccount(phone, code) {
+      const result = await apiRequest<{ user: DemoUser; sessionToken: string }>('/api/auth/demo/register', {
         method: 'POST',
         body: JSON.stringify({ phone, code }),
       }, false);

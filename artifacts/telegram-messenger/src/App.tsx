@@ -48,6 +48,8 @@ function userError(error: unknown, fallback: string) {
   if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд Mono.';
   if (/rate limit|too many attempts/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
   if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
+  if (status === 404) return 'Аккаунт не найден. Переключитесь на регистрацию.';
+  if (status === 409) return 'Этот номер уже зарегистрирован. Переключитесь на вход.';
   if (status === 401) return 'Сессия завершена. Войдите снова.';
   if (/[А-Яа-яЁё]/.test(message)) return message;
   return fallback;
@@ -58,7 +60,8 @@ function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'displayName
 }
 
 function AuthScreen() {
-  const { requestDemoCode, verifyDemoCode } = useAuth();
+  const { requestDemoCode, verifyDemoCode, registerDemoAccount } = useAuth();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [demoCode, setDemoCode] = useState('');
   const [inputCode, setInputCode] = useState('');
@@ -104,9 +107,15 @@ function AuthScreen() {
     setError('');
     setBusy(true);
     try {
-      await verifyDemoCode(`+7${phoneDigits}`, inputCode);
+      if (mode === 'register') {
+        await registerDemoAccount(`+7${phoneDigits}`, inputCode);
+      } else {
+        await verifyDemoCode(`+7${phoneDigits}`, inputCode);
+      }
     } catch (e) {
-      setError(userError(e, 'Код не подошёл. Проверьте его и попробуйте снова.'));
+      setError(userError(e, mode === 'register'
+        ? 'Не удалось создать аккаунт. Проверьте код и попробуйте снова.'
+        : 'Код не подошёл. Проверьте его и попробуйте снова.'));
     } finally {
       setBusy(false);
     }
@@ -123,13 +132,19 @@ function AuthScreen() {
           <span>Mono</span>
         </a>
         <div className="mono-auth__card-meta">
-          <span className="mono-auth__eyebrow">{step === 'phone' ? 'БЫСТРЫЙ ВХОД' : 'ПОДТВЕРЖДЕНИЕ НОМЕРА'}</span>
+          <span className="mono-auth__eyebrow">{step === 'phone'
+            ? mode === 'login' ? 'БЫСТРЫЙ ВХОД' : 'РЕГИСТРАЦИЯ'
+            : 'ПОДТВЕРЖДЕНИЕ НОМЕРА'}</span>
           <span className="mono-auth__secure"><Shield size={14} /> Mono Messenger</span>
         </div>
         <header className="mono-auth__intro">
-          <h1 id="mono-auth-title">{step === 'phone' ? 'Войти в Mono' : 'Введите код'}</h1>
+          <h1 id="mono-auth-title">{step === 'phone'
+            ? mode === 'login' ? 'Войти в Mono' : 'Создать аккаунт'
+            : 'Введите код'}</h1>
           <p>{step === 'phone'
-            ? 'Укажите номер телефона, чтобы открыть свои чаты.'
+            ? mode === 'login'
+              ? 'Укажите номер телефона, чтобы открыть свои чаты.'
+              : 'Укажите номер телефона, чтобы создать аккаунт и начать общаться.'
             : `Код для номера ${formattedPhone}. SMS не отправляется — это демо-вход.`}</p>
         </header>
 
@@ -151,12 +166,12 @@ function AuthScreen() {
           </div>
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
           <Button className="mono-auth__submit" type="submit" disabled={busy || phoneDigits.length !== 10} data-testid="button-request-code">
-            {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>Далее <ArrowRight size={17} /></>}
+            {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>{mode === 'login' ? 'Далее' : 'Продолжить регистрацию'} <ArrowRight size={17} /></>}
           </Button>
           <p className="mono-auth__hint">На этом демо-этапе код появится на экране, SMS не отправляется.</p>
         </form> : <form className="mono-auth__form" onSubmit={confirmCode}>
           <div className="mono-auth__demo-code" role="status" data-testid="demo-code">
-            <span>Ваш демо-код</span>
+            <span>{mode === 'login' ? 'Ваш демо-код входа' : 'Ваш демо-код регистрации'}</span>
             <strong>{demoCode}</strong>
           </div>
           <div className="mono-auth__field">
@@ -176,13 +191,25 @@ function AuthScreen() {
           </div>
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
           <Button className="mono-auth__submit" type="submit" disabled={busy || inputCode.length !== 5} data-testid="button-confirm-code">
-            {busy ? <><LoaderCircle className="spin" size={17} /> Проверяем</> : <>Подтвердить <Check size={17} /></>}
+            {busy
+              ? <><LoaderCircle className="spin" size={17} /> {mode === 'login' ? 'Проверяем' : 'Создаём аккаунт'}</>
+              : <>{mode === 'login' ? 'Войти' : 'Зарегистрироваться'} <Check size={17} /></>}
           </Button>
           <button className="mono-auth__back" type="button" onClick={() => { setError(''); setStep('phone'); }} data-testid="button-edit-phone">
             <ArrowLeft size={15} /> Изменить номер
           </button>
         </form>}
-        <footer className="mono-auth__foot"><Shield size={15} /><span>Вход в стиле Mono, без почты и пароля</span></footer>
+        {step === 'phone' && <p className="mono-auth__switch">
+          {mode === 'login' ? 'Впервые в Mono?' : 'Уже есть аккаунт?'}
+          <button
+            type="button"
+            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
+            data-testid="button-toggle-auth-mode"
+          >
+            {mode === 'login' ? 'Создать аккаунт' : 'Войти'}
+          </button>
+        </p>}
+        <footer className="mono-auth__foot"><Shield size={15} /><span>Демо-режим: SMS не отправляется</span></footer>
       </section>
     </div>
   </main>;
