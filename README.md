@@ -28,6 +28,19 @@ Add these environment variables in the Vercel project settings for Production an
 
 Apply `supabase/schema.sql` to the Supabase project and add the Vercel production and preview URLs to Supabase Auth's allowed redirect URLs. The Vercel build serves the static frontend; authentication, app data, and realtime presence use Supabase.
 
+## Deploy to Render
+
+The repository includes a `render.yaml` Blueprint for the MonoGram static web app. In Render, choose **New > Blueprint**, connect this GitHub repository, and confirm the generated `monogram` static site. Render installs the workspace dependencies, builds the Vite app, and serves its SPA routes.
+
+When Render asks for environment values, set:
+
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+
+Apply `supabase/schema.sql` to the Supabase project, then add the Render URL assigned after the first deploy to Supabase Auth's allowed redirect URLs. Email confirmation delivery must also be enabled in Supabase; Render does not send those emails. Do not put a Supabase service-role key in this static app.
+
+The Blueprint intentionally deploys only the web app: MonoGram uses Supabase directly for authentication, data, and realtime updates, so the separate API Server artifact is not required for this site.
+
 ## Behavior and limits
 
 - Sign-in uses Supabase email and password authentication.

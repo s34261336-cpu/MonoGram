@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: monogram
+    runtime: static
+    buildCommand: corepack pnpm install --frozen-lockfile --prod=false --filter @workspace/telegram-messenger... && corepack pnpm --filter @workspace/telegram-messenger run build
+    staticPublishPath: artifacts/telegram-messenger/dist/public
+    envVars:
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
