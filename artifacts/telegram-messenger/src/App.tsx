@@ -51,16 +51,28 @@ function userError(error: unknown, fallback: string) {
   if (/email not confirmed/.test(normalized) || code === 'email_not_confirmed') return 'Сначала подтвердите адрес электронной почты.';
   if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд MonoGram.';
   if (/user already registered|already exists|duplicate key/.test(normalized) || ['user_already_exists', 'email_exists'].includes(code)) return 'Эти данные уже используются. Проверьте адрес почты и имя пользователя.';
-  if (/signup.*disabled|signups?.*(not allowed|disabled)|registration.*(not allowed|disabled)|not allowed.*signup/.test(normalized) || code === 'signup_disabled') return 'Регистрация отключена. Разрешите создание аккаунтов по электронной почте в настройках Supabase.';
+  if (/signup.*disabled|signups?.*(not allowed|disabled)|registration.*(not allowed|disabled)|not allowed.*signup|user not allowed/.test(normalized) || code === 'signup_disabled') return 'Регистрация отключена. Разрешите создание аккаунтов по электронной почте в настройках Supabase.';
   if (/unable to validate email|invalid email|email address.*invalid/.test(normalized) || code === 'email_address_invalid') return 'Введите корректный адрес электронной почты.';
+  if (/email.*not authorized/.test(normalized) || code === 'email_address_not_authorized') return 'Этот адрес почты не разрешён для регистрации. Проверьте ограничения в Supabase.';
   if (/database error saving new user|database error creating user/.test(normalized)) return 'Supabase не смог сохранить профиль при регистрации. Нужно проверить триггер создания профиля в базе данных.';
-  if (/error sending confirmation email|failed to send.*email|smtp.*(error|not configured)/.test(normalized) || code === 'email_provider_disabled') return 'Не удалось отправить письмо для подтверждения. Проверьте настройки почты в Supabase.';
+  if (/error sending confirmation email|failed to send.*email|smtp.*(error|not configured)/.test(normalized) || ['email_provider_disabled', 'email_send_failed'].includes(code)) return 'Не удалось отправить письмо для подтверждения. Проверьте настройки почты в Supabase.';
+  if (/unsupported provider|provider.*disabled/.test(normalized) || code === 'unsupported_provider') return 'Вход по электронной почте отключён. Включите этот способ входа в настройках Supabase.';
   if (/security purposes|only request this after/.test(normalized)) return 'Слишком частые попытки. Подождите минуту и попробуйте снова.';
   if (/password.*(weak|short|characters)|at least \d+ characters/.test(normalized) || code === 'weak_password') return 'Пароль слишком короткий. Используйте не менее 8 символов.';
   if (/rate limit|too many requests/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
   if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
   if (/[А-Яа-яЁё]/.test(message)) return message;
   return fallback;
+}
+
+function errorDiagnostic(error: unknown) {
+  if (typeof error !== 'object' || error === null) return '';
+  const details = error as { code?: unknown; status?: unknown };
+  const values = [
+    typeof details.code === 'string' ? `код: ${details.code}` : '',
+    typeof details.status === 'number' ? `статус: ${details.status}` : '',
+  ].filter(Boolean);
+  return values.length ? `Подробности для поддержки: ${values.join(', ')}.` : '';
 }
 
 function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'displayName' | 'avatarUrl'>; size?: 'sm' | 'md' | 'lg' }) {
@@ -87,12 +99,14 @@ function AuthScreen() {
         if (!signedIn) setRegister(false);
       } else await signIn(values.email, values.password);
     } catch (e) {
-      setError(userError(
+      const fallback = register
+        ? 'Не удалось создать аккаунт. Проверьте адрес почты и настройки регистрации, затем попробуйте снова.'
+        : 'Не удалось войти. Проверьте адрес почты и пароль.';
+      const message = userError(
         e,
-        register
-          ? 'Не удалось создать аккаунт. Проверьте адрес почты и настройки регистрации, затем попробуйте снова.'
-          : 'Не удалось войти. Проверьте адрес почты и пароль.',
-      ));
+        fallback,
+      );
+      setError(message === fallback ? `${message} ${errorDiagnostic(e)}`.trim() : message);
     }
     finally { setBusy(false); }
   }
