@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: chats
+    description: Chat list and message history
 paths:
   /healthz:
     get:
@@ -24,6 +26,64 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /chats:
+    get:
+      operationId: getChats
+      tags: [chats]
+      summary: List chats
+      responses:
+        "200":
+          description: Chat list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Chat"
+  /chats/{chatId}/messages:
+    get:
+      operationId: getChatMessages
+      tags: [chats]
+      summary: Get a chat's messages
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages in the chat
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+        "404":
+          description: Chat not found
+  /messages:
+    post:
+      operationId: sendMessage
+      tags: [chats]
+      summary: Send a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          description: Invalid message
+        "404":
+          description: Chat not found
 components:
   schemas:
     HealthStatus:
@@ -33,4 +93,82 @@ components:
           type: string
       required:
         - status
+    ChatPreview:
+      type: object
+      properties:
+        text:
+          type: string
+        time:
+          type: string
+        fromMe:
+          type: boolean
+        read:
+          type: boolean
+      required: [text, time, fromMe, read]
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        initials:
+          type: string
+        color:
+          type: string
+        online:
+          type: boolean
+        unreadCount:
+          type: integer
+        isGroup:
+          type: boolean
+        lastMessage:
+          $ref: "#/components/schemas/ChatPreview"
+      required: [id, name, initials, color, online, unreadCount, isGroup, lastMessage]
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        chatId:
+          type: string
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        authorId:
+          type: string
+        authorName:
+          type: string
+        outgoing:
+          type: boolean
+        read:
+          type: boolean
+        kind:
+          type: string
+          enum: [text, file, voice]
+        fileName:
+          type: ["string", "null"]
+      required: [id, chatId, text, createdAt, authorId, authorName, outgoing, read, kind, fileName]
+    MessageInput:
+      type: object
+      properties:
+        chatId:
+          type: string
+          minLength: 1
+        text:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        authorName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        kind:
+          type: string
+          enum: [text, file, voice]
+        fileName:
+          type: string
+      required: [chatId, text, authorName]
 

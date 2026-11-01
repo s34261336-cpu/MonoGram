@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Telegram Messenger"
+description = "A responsive Telegram-inspired messaging app with simulated phone sign-in, live chat messaging, and online presence powered by a Node.js server."
+version = "1.0.0"
+id = "artifacts/telegram-messenger"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20292
+
+[services.development]
+run = "pnpm --filter @workspace/telegram-messenger run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/telegram-messenger", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/telegram-messenger/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20292"
+BASE_PATH = "/"
