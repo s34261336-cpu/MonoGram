@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, Router as WouterRouter, Link, useLocation, useParams } from 'wouter';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, useMessengerRealtime, usePosts, useProfile, useSaveProfile, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
+import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, usePosts, useProfile, useSaveProfile, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
 import { usePresence } from '@/hooks/use-presence';
 import type { Channel, ChannelPost, Conversation, DirectMessage, Profile } from '@/lib/messenger';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -10,13 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, ArrowRight, AtSign, Check, ChevronDown, CircleUserRound, Compass, Crown, Eye, EyeOff, Hash, LoaderCircle, LockKeyhole, LogOut, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Check, ChevronDown, CircleUserRound, Compass, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
@@ -45,37 +43,14 @@ function userError(error: unknown, fallback: string) {
   const message = error instanceof Error
     ? error.message
     : typeof details.message === 'string' ? details.message : '';
-  const code = typeof details.code === 'string' ? details.code.toLowerCase() : '';
   const status = typeof details.status === 'number' ? details.status : 0;
-  const normalized = `${message} ${code}`.toLowerCase();
-  if (/invalid login credentials|invalid email or password/.test(normalized)) return 'Неверный адрес почты или пароль.';
-  if (/supabase не настроен|supabase.*not configured/.test(normalized)) return 'Подключение к Supabase не настроено. Регистрация и отправка писем пока недоступны.';
-  if (/email not confirmed/.test(normalized) || code === 'email_not_confirmed') return 'Сначала подтвердите адрес электронной почты.';
+  const normalized = message.toLowerCase();
   if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд Mono.';
-  if (/user already registered|already exists|duplicate key/.test(normalized) || ['user_already_exists', 'email_exists'].includes(code)) return 'Эти данные уже используются. Проверьте адрес почты и имя пользователя.';
-  if (/signup.*disabled|signups?.*(not allowed|disabled)|registration.*(not allowed|disabled)|not allowed.*signup|user not allowed/.test(normalized) || code === 'signup_disabled') return 'Регистрация отключена. Разрешите создание аккаунтов по электронной почте в настройках Supabase.';
-  if (/unable to validate email|invalid email|email address.*invalid/.test(normalized) || code === 'email_address_invalid') return 'Введите корректный адрес электронной почты.';
-  if (/email.*not authorized/.test(normalized) || code === 'email_address_not_authorized') return 'Этот адрес почты не разрешён для регистрации. Проверьте ограничения в Supabase.';
-  if (/database error saving new user|database error creating user/.test(normalized)) return 'Supabase не смог сохранить профиль при регистрации. Нужно проверить триггер создания профиля в базе данных.';
-  if (/error sending confirmation email|failed to send.*email|smtp.*(error|not configured)/.test(normalized) || ['email_provider_disabled', 'email_send_failed'].includes(code)) return 'Не удалось отправить письмо для подтверждения. Проверьте настройки почты в Supabase.';
-  if (/unsupported provider|provider.*disabled/.test(normalized) || code === 'unsupported_provider') return 'Вход по электронной почте отключён. Включите этот способ входа в настройках Supabase.';
-  if (/security purposes|only request this after/.test(normalized)) return 'Слишком частые попытки. Подождите минуту и попробуйте снова.';
-  if (/password.*(weak|short|characters)|at least \d+ characters/.test(normalized) || code === 'weak_password') return 'Пароль слишком короткий. Используйте не менее 8 символов.';
-  if (/rate limit|too many requests/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
+  if (/rate limit|too many attempts/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
   if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
-  if (status === 401) return 'Supabase отказал в доступе. Проверьте, что адрес проекта (не адрес базы данных) и публичный ключ для приложения взяты из одного проекта.';
+  if (status === 401) return 'Сессия завершена. Войдите снова.';
   if (/[А-Яа-яЁё]/.test(message)) return message;
   return fallback;
-}
-
-function errorDiagnostic(error: unknown) {
-  if (typeof error !== 'object' || error === null) return '';
-  const details = error as { code?: unknown; status?: unknown };
-  const values = [
-    typeof details.code === 'string' ? `код: ${details.code}` : '',
-    typeof details.status === 'number' ? `статус: ${details.status}` : '',
-  ].filter(Boolean);
-  return values.length ? `Подробности для поддержки: ${values.join(', ')}.` : '';
 }
 
 function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'displayName' | 'avatarUrl'>; size?: 'sm' | 'md' | 'lg' }) {
@@ -83,50 +58,58 @@ function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'displayName
 }
 
 function AuthScreen() {
-  const { signIn, signUp } = useAuth();
-  const [register, setRegister] = useState(false);
+  const { requestDemoCode, verifyDemoCode } = useAuth();
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [demoCode, setDemoCode] = useState('');
+  const [inputCode, setInputCode] = useState('');
+  const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [error, setError] = useState('');
-  const [pendingEmail, setPendingEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const schema = z.object({
-    displayName: z.string().optional(),
-    email: z.string().email('Введите корректный адрес электронной почты.'),
-    password: z.string().min(8, 'Пароль должен содержать не менее 8 символов.'),
-  }).refine(v => !register || (v.displayName || '').trim().length >= 2, { path: ['displayName'], message: 'Имя должно содержать не менее 2 символов.' });
-  const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { displayName: '', email: '', password: '' } });
-  async function submit(values: z.infer<typeof schema>) {
-    setError(''); setPendingEmail(''); setBusy(true);
+  const formattedPhone = `+7 (${phoneDigits.slice(0, 3).padEnd(3, '_')}) ${phoneDigits.slice(3, 6).padEnd(3, '_')}-${phoneDigits.slice(6, 8).padEnd(2, '_')}-${phoneDigits.slice(8, 10).padEnd(2, '_')}`;
+
+  function updatePhone(event: ChangeEvent<HTMLInputElement>) {
+    let digits = event.currentTarget.value.replace(/\D/g, '');
+    if (digits.startsWith('7') || digits.startsWith('8')) digits = digits.slice(1);
+    const inputType = (event.nativeEvent as InputEvent).inputType;
+    if (inputType.startsWith('delete') && digits.length >= phoneDigits.length && phoneDigits.length) {
+      digits = phoneDigits.slice(0, -1);
+    }
+    setPhoneDigits(digits.slice(0, 10));
+  }
+
+  async function requestCode(event: FormEvent) {
+    event.preventDefault();
+    if (phoneDigits.length !== 10) {
+      setError('Введите номер полностью.');
+      return;
+    }
+    setError('');
+    setBusy(true);
     try {
-      if (register) {
-        const result = await signUp(values.email, values.password, values.displayName || '');
-        if (result === 'confirmation-required') {
-          setPendingEmail(values.email.trim());
-          setRegister(false);
-        } else if (result === 'existing-account') {
-          setRegister(false);
-          form.setValue('email', values.email.trim());
-          setError('Этот адрес уже зарегистрирован. Войдите в существующий аккаунт.');
-        }
-      } else await signIn(values.email, values.password);
+      setDemoCode(await requestDemoCode(`+7${phoneDigits}`));
+      setInputCode('');
+      setStep('code');
     } catch (e) {
-      const fallback = register
-        ? 'Не удалось создать аккаунт. Проверьте адрес почты и настройки регистрации, затем попробуйте снова.'
-        : 'Не удалось войти. Проверьте адрес почты и пароль.';
-      const message = userError(
-        e,
-        fallback,
-      );
-      setError(message === fallback ? `${message} ${errorDiagnostic(e)}`.trim() : message);
+      setError(userError(e, 'Не удалось получить демо-код. Попробуйте ещё раз.'));
     }
     finally { setBusy(false); }
   }
-  function changeMode() {
-    setRegister(!register);
+
+  async function confirmCode(event: FormEvent) {
+    event.preventDefault();
+    if (inputCode.length !== 5) {
+      setError('Введите все пять цифр кода.');
+      return;
+    }
     setError('');
-    setPendingEmail('');
-    setShowPassword(false);
-    form.clearErrors();
+    setBusy(true);
+    try {
+      await verifyDemoCode(`+7${phoneDigits}`, inputCode);
+    } catch (e) {
+      setError(userError(e, 'Код не подошёл. Проверьте его и попробуйте снова.'));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return <main className="mono-auth">
@@ -134,94 +117,72 @@ function AuthScreen() {
     <div className="mono-auth__glow mono-auth__glow--top" aria-hidden="true" />
     <div className="mono-auth__glow mono-auth__glow--bottom" aria-hidden="true" />
     <div className="mono-auth__shell">
-      <section className="mono-auth__story" aria-label="О Mono">
-        <a className="mono-auth__brand" href="/" aria-label="Mono — главная">
-          <span className="mono-auth__brand-icon"><MessageCircle size={21} strokeWidth={2.2} /></span>
-          <span>Mono</span>
-        </a>
-        <div className="mono-auth__story-copy">
-          <span className="mono-auth__eyebrow">ВАШ КРУГ ОБЩЕНИЯ</span>
-          <h2>Ближе к тем,<br />кто важен.</h2>
-          <p>Личные сообщения и интересные каналы — в одном спокойном пространстве.</p>
-        </div>
-        <div className="mono-auth__chat-preview" aria-hidden="true">
-          <div className="mono-auth__chat-head">
-            <span className="mono-auth__mini-avatar">И</span>
-            <span><b>Ирина</b><small>была недавно</small></span>
-            <i />
-          </div>
-          <div className="mono-auth__message mono-auth__message--in">Ты сегодня на связи?</div>
-          <div className="mono-auth__message mono-auth__message--out">Да, уже здесь <Check size={13} /></div>
-        </div>
-        <div className="mono-auth__story-foot"><span /> Mono — место для своих разговоров</div>
-      </section>
-
       <section className="mono-auth__card" aria-labelledby="mono-auth-title">
         <a className="mono-auth__mobile-brand" href="/" aria-label="Mono — главная">
           <span className="mono-auth__brand-icon"><MessageCircle size={20} strokeWidth={2.2} /></span>
           <span>Mono</span>
         </a>
         <div className="mono-auth__card-meta">
-          <span className="mono-auth__eyebrow">{pendingEmail ? 'ПОЧТИ ГОТОВО' : register ? 'НОВЫЙ АККАУНТ' : 'РАДЫ ВАС ВИДЕТЬ'}</span>
-          <span className="mono-auth__secure"><Shield size={14} /> Личное пространство</span>
+          <span className="mono-auth__eyebrow">{step === 'phone' ? 'БЫСТРЫЙ ВХОД' : 'ПОДТВЕРЖДЕНИЕ НОМЕРА'}</span>
+          <span className="mono-auth__secure"><Shield size={14} /> Mono Messenger</span>
         </div>
         <header className="mono-auth__intro">
-          <h1 id="mono-auth-title">{pendingEmail ? 'Проверьте почту' : register ? 'Создайте свой Mono' : 'С возвращением'}</h1>
-          <p>{pendingEmail
-            ? `Supabase принял запрос на подтверждение адреса ${pendingEmail}. Доставка зависит от настроек почты проекта.`
-            : register
-              ? 'Зарегистрируйтесь, чтобы быть ближе к своим людям.'
-              : 'Войдите, чтобы вернуться к своим разговорам.'}</p>
+          <h1 id="mono-auth-title">{step === 'phone' ? 'Войти в Mono' : 'Введите код'}</h1>
+          <p>{step === 'phone'
+            ? 'Укажите номер телефона, чтобы открыть свои чаты.'
+            : `Код для номера ${formattedPhone}. SMS не отправляется — это демо-вход.`}</p>
         </header>
 
-        {pendingEmail ? <div className="mono-auth__confirmation" role="status" data-testid="auth-message">
-          <span className="mono-auth__confirmation-icon"><Check size={21} /></span>
-          <div>
-            <b>Запрос на подтверждение принят</b>
-            <p>Проверьте «Входящие» и «Спам». Если письма нет, проверьте настройки почтового провайдера в Supabase.</p>
+        {step === 'phone' ? <form className="mono-auth__form" onSubmit={requestCode}>
+          <div className="mono-auth__field">
+            <label htmlFor="input-phone">Номер телефона</label>
+            <div className="mono-auth__control">
+              <Phone size={17} aria-hidden="true" />
+              <input
+                id="input-phone"
+                autoComplete="tel"
+                aria-label="Номер телефона"
+                inputMode="tel"
+                value={formattedPhone}
+                onChange={updatePhone}
+                data-testid="input-phone"
+              />
+            </div>
           </div>
-          <Button className="mono-auth__submit mono-auth__submit--secondary" type="button" onClick={() => { setPendingEmail(''); form.setValue('email', pendingEmail); }} data-testid="button-confirmation-sign-in">
-            Перейти ко входу <ArrowRight size={17} />
-          </Button>
-        </div> : <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="mono-auth__form">
-          {register && <FormField control={form.control} name="displayName" render={({ field }) => <FormItem className="mono-auth__field">
-            <FormLabel>Ваше имя</FormLabel>
-            <div className="mono-auth__control">
-              <UserRound size={17} aria-hidden="true" />
-              <FormControl><Input data-testid="input-display-name" autoComplete="name" placeholder="Как к вам обращаться" {...field} /></FormControl>
-            </div>
-            <FormMessage />
-          </FormItem>} />}
-          <FormField control={form.control} name="email" render={({ field }) => <FormItem className="mono-auth__field">
-            <FormLabel>Электронная почта</FormLabel>
-            <div className="mono-auth__control">
-              <AtSign size={17} aria-hidden="true" />
-              <FormControl><Input data-testid="input-email" type="email" autoComplete="email" placeholder="имя@почта.ru" {...field} /></FormControl>
-            </div>
-            <FormMessage />
-          </FormItem>} />
-          <FormField control={form.control} name="password" render={({ field }) => <FormItem className="mono-auth__field">
-            <FormLabel>Пароль</FormLabel>
-            <div className="mono-auth__control">
-              <LockKeyhole size={17} aria-hidden="true" />
-              <FormControl><Input data-testid="input-password" type={showPassword ? 'text' : 'password'} autoComplete={register ? 'new-password' : 'current-password'} placeholder={register ? 'Не менее 8 символов' : 'Введите пароль'} {...field} /></FormControl>
-              <button className="mono-auth__password-toggle" type="button" aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>
-                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-              </button>
-            </div>
-            <FormMessage />
-          </FormItem>} />
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
-          <Button className="mono-auth__submit" type="submit" disabled={busy} data-testid={register ? 'button-register' : 'button-sign-in'}>
-            {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>{register ? 'Создать аккаунт' : 'Войти'} <ArrowRight size={17} /></>}
+          <Button className="mono-auth__submit" type="submit" disabled={busy || phoneDigits.length !== 10} data-testid="button-request-code">
+            {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>Далее <ArrowRight size={17} /></>}
           </Button>
-        </form></Form>}
-
-        {!pendingEmail && <div className="mono-auth__switch">
-          <span>{register ? 'Уже есть аккаунт?' : 'Впервые в Mono?'}</span>
-          <button type="button" data-testid="button-toggle-auth" onClick={changeMode}>{register ? 'Войти' : 'Создать аккаунт'}</button>
-        </div>}
-        <footer className="mono-auth__foot"><Shield size={15} /><span>Ваш аккаунт по умолчанию закрыт</span></footer>
+          <p className="mono-auth__hint">На этом демо-этапе код появится на экране, SMS не отправляется.</p>
+        </form> : <form className="mono-auth__form" onSubmit={confirmCode}>
+          <div className="mono-auth__demo-code" role="status" data-testid="demo-code">
+            <span>Ваш демо-код</span>
+            <strong>{demoCode}</strong>
+          </div>
+          <div className="mono-auth__field">
+            <label htmlFor="input-demo-code">Код из пяти цифр</label>
+            <div className="mono-auth__control mono-auth__control--code">
+              <input
+                id="input-demo-code"
+                autoComplete="one-time-code"
+                aria-label="Демо-код"
+                inputMode="numeric"
+                maxLength={5}
+                value={inputCode}
+                onChange={event => setInputCode(event.target.value.replace(/\D/g, '').slice(0, 5))}
+                data-testid="input-demo-code"
+              />
+            </div>
+          </div>
+          {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
+          <Button className="mono-auth__submit" type="submit" disabled={busy || inputCode.length !== 5} data-testid="button-confirm-code">
+            {busy ? <><LoaderCircle className="spin" size={17} /> Проверяем</> : <>Подтвердить <Check size={17} /></>}
+          </Button>
+          <button className="mono-auth__back" type="button" onClick={() => { setError(''); setStep('phone'); }} data-testid="button-edit-phone">
+            <ArrowLeft size={15} /> Изменить номер
+          </button>
+        </form>}
+        <footer className="mono-auth__foot"><Shield size={15} /><span>Вход в стиле Mono, без почты и пароля</span></footer>
       </section>
     </div>
   </main>;
@@ -266,7 +227,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [path] = useLocation();
   const profileQuery = useProfile(user?.id || '');
   const profile = profileQuery.data;
-  useMessengerRealtime(user?.id || '');
   const inConversation = path.startsWith('/chat/');
   return <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`}>
     <div className="workspace-main">{children}</div>

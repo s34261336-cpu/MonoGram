@@ -6,88 +6,79 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { requireSupabase, supabase } from '@/lib/supabase';
+import {
+  apiRequest,
+  clearDemoSession,
+  readStoredDemoSession,
+  storeDemoSession,
+  type DemoUser,
+} from '@/lib/api';
 
 type AuthContextValue = {
-  session: Session | null;
-  user: User | null;
+  user: DemoUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (
-    email: string,
-    password: string,
-    displayName: string,
-  ) => Promise<'signed-in' | 'confirmation-required' | 'existing-account'>;
+  requestDemoCode: (phone: string) => Promise<string>;
+  verifyDemoCode: (phone: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<DemoUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!supabase) {
+    const saved = readStoredDemoSession();
+    if (!saved) {
       setLoading(false);
       return;
     }
 
     let alive = true;
-    const client = supabase;
-    client.auth.getSession().then(({ data, error }) => {
-      if (!alive) return;
-      if (error) console.error('Supabase session could not be restored.');
-      setSession(data.session);
-      setLoading(false);
-    });
+    apiRequest<DemoUser>('/api/auth/session')
+      .then((restoredUser) => {
+        if (alive) setUser(restoredUser);
+      })
+      .catch((error: unknown) => {
+        if (!alive) return;
+        if (typeof error === 'object' && error !== null && 'status' in error && error.status === 401) {
+          clearDemoSession();
+          setUser(null);
+        } else {
+          setUser(saved.user);
+        }
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
 
-    const { data } = client.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setLoading(false);
-    });
-
-    return () => {
-      alive = false;
-      data.subscription.unsubscribe();
-    };
+    return () => { alive = false; };
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
-    session,
-    user: session?.user ?? null,
+    user,
     loading,
-    async signIn(email, password) {
-      const { data, error } = await requireSupabase().auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (error) throw error;
-      if (!data.user || !data.session) {
-        throw new Error('Supabase не подтвердил вход. Проверьте адрес, пароль и подтверждение почты.');
-      }
+    async requestDemoCode(phone) {
+      const result = await apiRequest<{ demoCode: string }>('/api/auth/demo/request-code', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+      }, false);
+      return result.demoCode;
     },
-    async signUp(email, password, displayName) {
-      const { data, error } = await requireSupabase().auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { display_name: displayName.trim() } },
-      });
-      if (error) throw error;
-      if (!data.user) {
-        throw new Error('Supabase не вернул данные нового аккаунта.');
-      }
-      if (!data.session && data.user.identities?.length === 0) {
-        return 'existing-account';
-      }
-      return data.session ? 'signed-in' : 'confirmation-required';
+    async verifyDemoCode(phone, code) {
+      const result = await apiRequest<{ user: DemoUser; sessionToken: string }>('/api/auth/demo/verify-code', {
+        method: 'POST',
+        body: JSON.stringify({ phone, code }),
+      }, false);
+      storeDemoSession({ sessionToken: result.sessionToken, user: result.user });
+      setUser(result.user);
     },
     async signOut() {
-      const { error } = await requireSupabase().auth.signOut();
-      if (error) throw error;
+      clearDemoSession();
+      setUser(null);
     },
-  }), [session, loading]);
+  }), [user, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

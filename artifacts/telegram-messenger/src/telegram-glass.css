@@ -1244,3 +1244,86 @@ select:focus-visible {
     transition: none;
   }
 }
+
+.mono-auth__field label {
+  display: block;
+  color: #c1cdd5;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mono-auth__control input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.mono-auth__control--code {
+  justify-content: center;
+}
+
+.mono-auth__control--code input {
+  max-width: 190px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: .34em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mono-auth__demo-code {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  margin: 2px 0 3px;
+  padding: 17px 16px;
+  border: 1px solid rgba(42, 171, 238, .25);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(20, 137, 202, .14), rgba(42, 171, 238, .08));
+}
+
+.mono-auth__demo-code span {
+  color: #9fb4c2;
+  font-size: 11px;
+}
+
+.mono-auth__demo-code strong {
+  color: #a9e0ff;
+  font-size: clamp(32px, 9vw, 40px);
+  line-height: 1;
+  letter-spacing: .16em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mono-auth__hint {
+  margin: -4px 0 0;
+  color: #889aa6;
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.mono-auth__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  margin: -4px auto 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  color: #89cfee;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mono-auth__back:hover {
+  background: rgba(56, 157, 184, .13);
+}

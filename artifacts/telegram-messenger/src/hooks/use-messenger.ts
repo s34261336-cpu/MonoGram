@@ -1,6 +1,4 @@
-import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { requireSupabase } from '@/lib/supabase';
 import {
   createChannel,
   createPost,
@@ -51,6 +49,7 @@ export function useChats(userId: string) {
     queryKey: messengerKeys.chats(userId),
     queryFn: () => getConversations(userId),
     enabled: Boolean(userId),
+    refetchInterval: 8_000,
   });
 }
 
@@ -59,6 +58,7 @@ export function useMessages(conversationId: string, userId: string) {
     queryKey: messengerKeys.messages(conversationId),
     queryFn: () => getMessages(conversationId),
     enabled: Boolean(conversationId && userId),
+    refetchInterval: 4_000,
   });
 }
 
@@ -75,6 +75,7 @@ export function usePosts(channelId: string, userId: string) {
     queryKey: messengerKeys.posts(channelId),
     queryFn: () => getChannelPosts(channelId, userId),
     enabled: Boolean(channelId && userId),
+    refetchInterval: 10_000,
   });
 }
 
@@ -164,36 +165,4 @@ export function useSendStars(userId: string, channelId: string) {
       void queryClient.invalidateQueries({ queryKey: messengerKeys.wallet(userId) });
     },
   });
-}
-
-export function useMessengerRealtime(userId: string) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!userId) return;
-    const client = requireSupabase();
-    const channel = client
-      .channel(`monogram-live-${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_messages' }, (payload) => {
-        const conversationId = (payload.new as { conversation_id?: string })?.conversation_id
-          ?? (payload.old as { conversation_id?: string })?.conversation_id;
-        if (conversationId) void queryClient.invalidateQueries({ queryKey: messengerKeys.messages(conversationId) });
-        void queryClient.invalidateQueries({ queryKey: messengerKeys.chats(userId) });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_posts' }, (payload) => {
-        const channelId = (payload.new as { channel_id?: string })?.channel_id
-          ?? (payload.old as { channel_id?: string })?.channel_id;
-        if (channelId) void queryClient.invalidateQueries({ queryKey: messengerKeys.posts(channelId) });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'star_reactions' }, (payload) => {
-        const postId = (payload.new as { post_id?: string })?.post_id
-          ?? (payload.old as { post_id?: string })?.post_id;
-        if (postId) void queryClient.invalidateQueries({ queryKey: ['channel-posts'] });
-      })
-      .subscribe();
-
-    return () => {
-      void client.removeChannel(channel);
-    };
-  }, [queryClient, userId]);
 }
