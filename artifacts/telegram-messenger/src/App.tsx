@@ -36,7 +36,7 @@ const transactionLabel = (reason: string) => ({
   channel_reaction: 'Отправка звёзд за публикацию',
 }[reason] || 'Операция со звёздами');
 
-function userError(error: unknown, fallback: string, authMode?: 'login' | 'register') {
+function userError(error: unknown, fallback: string, authMode?: 'login' | 'register' | 'request-code') {
   const details = typeof error === 'object' && error !== null
     ? error as { message?: unknown; code?: unknown; status?: unknown }
     : {};
@@ -48,6 +48,7 @@ function userError(error: unknown, fallback: string, authMode?: 'login' | 'regis
   if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд Mono.';
   if (/rate limit|too many attempts/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
   if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
+  if (status === 404 && authMode === 'request-code') return 'Сервис выдачи демо-кода не найден. Обновите страницу и попробуйте снова.';
   if (status === 404 && authMode === 'register') return 'Не удалось завершить регистрацию. Проверьте настройки базы данных и попробуйте снова.';
   if (status === 404 && authMode === 'login') return 'Аккаунт не найден. Переключитесь на регистрацию.';
   if (status === 409 && authMode === 'register') return 'Этот номер уже зарегистрирован. Переключитесь на вход.';
@@ -95,7 +96,7 @@ function AuthScreen() {
       setInputCode('');
       setStep('code');
     } catch (e) {
-      setError(userError(e, 'Не удалось получить демо-код. Попробуйте ещё раз.'));
+      setError(userError(e, 'Не удалось получить демо-код. Попробуйте ещё раз.', 'request-code'));
     }
     finally { setBusy(false); }
   }
