@@ -38,15 +38,27 @@ const transactionLabel = (reason: string) => ({
 }[reason] || 'Операция со звёздами');
 
 function userError(error: unknown, fallback: string) {
-  const message = error instanceof Error ? error.message : '';
-  const normalized = message.toLowerCase();
+  const details = typeof error === 'object' && error !== null
+    ? error as { message?: unknown; code?: unknown; status?: unknown }
+    : {};
+  const message = error instanceof Error
+    ? error.message
+    : typeof details.message === 'string' ? details.message : '';
+  const code = typeof details.code === 'string' ? details.code.toLowerCase() : '';
+  const status = typeof details.status === 'number' ? details.status : 0;
+  const normalized = `${message} ${code}`.toLowerCase();
   if (/invalid login credentials|invalid email or password/.test(normalized)) return 'Неверный адрес почты или пароль.';
-  if (/email not confirmed/.test(normalized)) return 'Сначала подтвердите адрес электронной почты.';
+  if (/email not confirmed/.test(normalized) || code === 'email_not_confirmed') return 'Сначала подтвердите адрес электронной почты.';
   if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд MonoGram.';
-  if (/user already registered|already exists|duplicate key/.test(normalized)) return 'Эти данные уже используются. Проверьте адрес почты и имя пользователя.';
-  if (/password.*(weak|short|characters)|at least \d+ characters/.test(normalized)) return 'Пароль слишком короткий. Используйте не менее 8 символов.';
-  if (/rate limit|too many requests/.test(normalized)) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
-  if (/failed to fetch|network|fetch error/.test(normalized)) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
+  if (/user already registered|already exists|duplicate key/.test(normalized) || ['user_already_exists', 'email_exists'].includes(code)) return 'Эти данные уже используются. Проверьте адрес почты и имя пользователя.';
+  if (/signup.*disabled|signups?.*(not allowed|disabled)|registration.*(not allowed|disabled)|not allowed.*signup/.test(normalized) || code === 'signup_disabled') return 'Регистрация отключена. Разрешите создание аккаунтов по электронной почте в настройках Supabase.';
+  if (/unable to validate email|invalid email|email address.*invalid/.test(normalized) || code === 'email_address_invalid') return 'Введите корректный адрес электронной почты.';
+  if (/database error saving new user|database error creating user/.test(normalized)) return 'Supabase не смог сохранить профиль при регистрации. Нужно проверить триггер создания профиля в базе данных.';
+  if (/error sending confirmation email|failed to send.*email|smtp.*(error|not configured)/.test(normalized) || code === 'email_provider_disabled') return 'Не удалось отправить письмо для подтверждения. Проверьте настройки почты в Supabase.';
+  if (/security purposes|only request this after/.test(normalized)) return 'Слишком частые попытки. Подождите минуту и попробуйте снова.';
+  if (/password.*(weak|short|characters)|at least \d+ characters/.test(normalized) || code === 'weak_password') return 'Пароль слишком короткий. Используйте не менее 8 символов.';
+  if (/rate limit|too many requests/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
+  if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
   if (/[А-Яа-яЁё]/.test(message)) return message;
   return fallback;
 }
@@ -74,7 +86,14 @@ function AuthScreen() {
         setError(signedIn ? '' : 'Проверьте почту, подтвердите адрес и затем войдите.');
         if (!signedIn) setRegister(false);
       } else await signIn(values.email, values.password);
-    } catch (e) { setError(userError(e, 'Не удалось продолжить. Попробуйте ещё раз.')); }
+    } catch (e) {
+      setError(userError(
+        e,
+        register
+          ? 'Не удалось создать аккаунт. Проверьте адрес почты и настройки регистрации, затем попробуйте снова.'
+          : 'Не удалось войти. Проверьте адрес почты и пароль.',
+      ));
+    }
     finally { setBusy(false); }
   }
   return <main className="auth-page">
