@@ -1,49 +1,49 @@
 # MonoGram
 
-Responsive Russian-language messenger with Supabase authentication, direct chats, channels, and realtime presence.
+Responsive Russian-language messenger with phone sign-in, direct chats, channels, and realtime presence.
 
 ## Run locally
 
-Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the environment, then run:
+Set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SESSION_SECRET` for the API service, then run both services:
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm --filter @workspace/api-server run dev
+```
+
+In a second terminal:
+
+```bash
 pnpm --filter @workspace/telegram-messenger run dev
 ```
 
-Build the frontend with:
+Build the full app with:
 
 ```bash
 pnpm run build
 ```
 
-## Deploy to Vercel
+## Static hosting
 
-Import `s34261336-cpu/MonoGram` from GitHub into Vercel with the repository root (`.`) as the project root. `vercel.json` sets the install command, build command, static output directory, and SPA route fallback.
-
-Add these environment variables in the Vercel project settings for Production and Preview deployments:
-
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY` (the legacy `SUPABASE_ANON_KEY` is also accepted)
-
-Apply `supabase/schema.sql` to the Supabase project and add the Vercel production and preview URLs to Supabase Auth's allowed redirect URLs. The Vercel build serves the static frontend; authentication, app data, and realtime presence use Supabase.
+The demo-code sign-in needs the `/api` server, so a static-only deployment is not enough. Use the one-service Render setup below, or configure another host to serve both the frontend and API from the same domain.
 
 ## Deploy to Render
 
-The repository includes a `render.yaml` Blueprint for the MonoGram static web app. In Render, choose **New > Blueprint**, connect this GitHub repository, and confirm the generated `monogram` static site. Render installs the workspace dependencies, builds the Vite app, and serves its SPA routes.
+The `render.yaml` Blueprint creates one Node web service named `monogram-fullstack`. It builds the frontend and API together, then serves both from the same address, so `/api` works without a second service or a separate API URL.
 
-When Render asks for environment values, set:
+In Render, choose **New > Blueprint** and connect this repository. Add these two values when prompted:
 
 - `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-Apply `supabase/schema.sql` to the Supabase project, then add the Render URL assigned after the first deploy to Supabase Auth's allowed redirect URLs. Email confirmation delivery must also be enabled in Supabase; Render does not send those emails. Do not put a Supabase service-role key in this static app.
+Render generates `SESSION_SECRET` automatically. Keep the service-role key on the server; it must not be added to frontend variables. Apply `supabase/schema.sql` to the Supabase project once before using registration.
 
-The Blueprint intentionally deploys only the web app: MonoGram uses Supabase directly for authentication, data, and realtime updates, so the separate API Server artifact is not required for this site.
+If a static Render service named `monogram` already exists, leave it in place until `monogram-fullstack` is deployed and verified. The new Blueprint uses a different name so it does not replace the existing service.
 
 ## Behavior and limits
 
-- Sign-in uses Supabase email and password authentication.
+- Sign-in and registration use a five-digit demo code shown on screen; no SMS is sent.
+- Demo codes expire after five minutes.
 - Direct messages, channels, and reactions are stored in Supabase.
 - Online status and database updates use Supabase Realtime.
 - File and voice controls are visual demo actions; media is not uploaded or stored.
