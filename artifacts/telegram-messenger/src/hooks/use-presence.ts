@@ -22,11 +22,17 @@ export function usePresence(userId?: string | null): PresenceState {
 
     const client = supabase;
     const channel = client.channel('monogram-presence', {
-      config: { presence: { key: userId } },
+      config: { presence: { key: crypto.randomUUID() } },
     });
 
     const syncPresence = () => {
-      const onlineUserIds = Object.keys(channel.presenceState());
+      const onlineUserIds = [...new Set(
+        Object.values(channel.presenceState<{ userId: string }>())
+          .flat()
+          .flatMap((presence) => (
+            typeof presence.userId === 'string' ? [presence.userId] : []
+          )),
+      )];
       setState({
         connected: true,
         onlineCount: onlineUserIds.length,
