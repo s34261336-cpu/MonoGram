@@ -14,7 +14,11 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<boolean>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName: string,
+  ) => Promise<'signed-in' | 'confirmation-required' | 'existing-account'>;
   signOut: () => Promise<void>;
 };
 
@@ -71,7 +75,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
         options: { data: { display_name: displayName.trim() } },
       });
       if (error) throw error;
-      return Boolean(data.session);
+      if (!data.user) {
+        throw new Error('Supabase не вернул данные нового аккаунта.');
+      }
+      if (!data.session && data.user.identities?.length === 0) {
+        return 'existing-account';
+      }
+      return data.session ? 'signed-in' : 'confirmation-required';
     },
     async signOut() {
       const { error } = await requireSupabase().auth.signOut();

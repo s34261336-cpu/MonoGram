@@ -1,2 +1,3 @@
 - [Replit GitHub proxy](replit-github-proxy.md) — `github.replit.internal` may be the normal proxied remote for a GitHub repo.
 - [Русский интерфейс](russian-ui.md) — бренд Mono; весь пользовательский интерфейс на русском.
+- [Стиль Telegram со стеклом](telegram-glass.md) — тёмный стеклянный интерфейс Mono следует Telegram-референсу; навигация снизу.

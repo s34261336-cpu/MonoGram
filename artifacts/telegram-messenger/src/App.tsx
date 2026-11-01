@@ -16,7 +16,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, ArrowRight, AtSign, Check, ChevronDown, CircleUserRound, Compass, Crown, Eye, EyeOff, Hash, LoaderCircle, LockKeyhole, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Check, ChevronDown, CircleUserRound, Compass, Crown, Eye, EyeOff, Hash, LoaderCircle, LockKeyhole, LogOut, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
@@ -49,6 +49,7 @@ function userError(error: unknown, fallback: string) {
   const status = typeof details.status === 'number' ? details.status : 0;
   const normalized = `${message} ${code}`.toLowerCase();
   if (/invalid login credentials|invalid email or password/.test(normalized)) return 'Неверный адрес почты или пароль.';
+  if (/supabase не настроен|supabase.*not configured/.test(normalized)) return 'Подключение к Supabase не настроено. Регистрация и отправка писем пока недоступны.';
   if (/email not confirmed/.test(normalized) || code === 'email_not_confirmed') return 'Сначала подтвердите адрес электронной почты.';
   if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд Mono.';
   if (/user already registered|already exists|duplicate key/.test(normalized) || ['user_already_exists', 'email_exists'].includes(code)) return 'Эти данные уже используются. Проверьте адрес почты и имя пользователя.';
@@ -98,9 +99,15 @@ function AuthScreen() {
     setError(''); setPendingEmail(''); setBusy(true);
     try {
       if (register) {
-        const signedIn = await signUp(values.email, values.password, values.displayName || '');
-        if (!signedIn) setPendingEmail(values.email.trim());
-        if (!signedIn) setRegister(false);
+        const result = await signUp(values.email, values.password, values.displayName || '');
+        if (result === 'confirmation-required') {
+          setPendingEmail(values.email.trim());
+          setRegister(false);
+        } else if (result === 'existing-account') {
+          setRegister(false);
+          form.setValue('email', values.email.trim());
+          setError('Этот адрес уже зарегистрирован. Войдите в существующий аккаунт.');
+        }
       } else await signIn(values.email, values.password);
     } catch (e) {
       const fallback = register
@@ -161,7 +168,7 @@ function AuthScreen() {
         <header className="mono-auth__intro">
           <h1 id="mono-auth-title">{pendingEmail ? 'Проверьте почту' : register ? 'Создайте свой Mono' : 'С возвращением'}</h1>
           <p>{pendingEmail
-            ? `Мы отправили ссылку для подтверждения на ${pendingEmail}. Подтвердите адрес, чтобы войти.`
+            ? `Supabase принял запрос на подтверждение адреса ${pendingEmail}. Доставка зависит от настроек почты проекта.`
             : register
               ? 'Зарегистрируйтесь, чтобы быть ближе к своим людям.'
               : 'Войдите, чтобы вернуться к своим разговорам.'}</p>
@@ -170,8 +177,8 @@ function AuthScreen() {
         {pendingEmail ? <div className="mono-auth__confirmation" role="status" data-testid="auth-message">
           <span className="mono-auth__confirmation-icon"><Check size={21} /></span>
           <div>
-            <b>Письмо уже в пути</b>
-            <p>Если его нет во входящих, проверьте папку со спамом.</p>
+            <b>Запрос на подтверждение принят</b>
+            <p>Проверьте «Входящие» и «Спам». Если письма нет, проверьте настройки почтового провайдера в Supabase.</p>
           </div>
           <Button className="mono-auth__submit mono-auth__submit--secondary" type="button" onClick={() => { setPendingEmail(''); form.setValue('email', pendingEmail); }} data-testid="button-confirmation-sign-in">
             Перейти ко входу <ArrowRight size={17} />
@@ -220,36 +227,50 @@ function AuthScreen() {
   </main>;
 }
 
-function Navigation({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
+function Navigation({ profile, hidden = false }: {
+  profile?: Pick<Profile, 'displayName' | 'avatarUrl'>;
+  hidden?: boolean;
+}) {
   const [path] = useLocation();
-  const links = [{ href: '/', label: 'Сообщения', testId: 'messages', icon: MessageCircle }, { href: '/channels', label: 'Каналы', testId: 'channels', icon: Compass }, { href: '/stars', label: 'Звёзды', testId: 'monostars', icon: Star }, { href: '/profile', label: 'Профиль', testId: 'my-profile', icon: CircleUserRound }];
-  return <nav className={`nav-links ${compact ? 'nav-compact' : ''}`}>{links.map(({ href, label, testId, icon: Icon }) => <Link key={href} href={href} onClick={onNavigate} className={`nav-item ${path === href || (href === '/channels' && path.startsWith('/channels/')) ? 'nav-active' : ''}`} data-testid={`link-${testId}`}><Icon size={18} /><span>{label}</span>{href === '/stars' && <span className="nav-new">СЧЁТ</span>}</Link>)}</nav>;
+  const links = [
+    { href: '/', label: 'Чаты', testId: 'messages', icon: MessageCircle },
+    { href: '/contacts', label: 'Контакты', testId: 'contacts', icon: CircleUserRound },
+    { href: '/settings', label: 'Настройки', testId: 'settings', icon: Settings2 },
+    { href: '/profile', label: 'Профиль', testId: 'my-profile', icon: UserRound },
+  ];
+  return <nav className={`mono-tabbar ${hidden ? 'mono-tabbar--hidden' : ''}`} aria-label="Главная навигация">
+    {links.map(({ href, label, testId, icon: Icon }) => {
+      const active = href === '/'
+        ? path === '/' || path.startsWith('/chat/')
+        : href === '/settings'
+          ? path === '/settings' || path.startsWith('/channels') || path === '/stars'
+          : path === href;
+      return <Link
+        key={href}
+        href={href}
+        className={`mono-tab ${active ? 'mono-tab--active' : ''}`}
+        aria-current={active ? 'page' : undefined}
+        data-testid={`link-${testId}`}
+      >
+        <span className="mono-tab__icon">
+          {href === '/profile' ? <Avatar profile={profile} size="sm" /> : <Icon size={26} strokeWidth={2.1} />}
+        </span>
+        <span className="mono-tab__label">{label}</span>
+      </Link>;
+    })}
+  </nav>;
 }
 
 function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const [path] = useLocation();
   const profileQuery = useProfile(user?.id || '');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [mobileNav, setMobileNav] = useState(false);
   const profile = profileQuery.data;
   useMessengerRealtime(user?.id || '');
-  async function logout() { await signOut(); }
-  return <div className="workspace">
-    <aside className="rail">
-      <Link href="/" className="rail-brand" aria-label="На главную Mono"><span className="brand-icon"><MessageCircle size={20} /></span></Link>
-      <Navigation />
-      <div className="rail-bottom">
-        <button className="rail-profile" onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню аккаунта" data-testid="button-account-menu"><Avatar profile={profile} size="sm" /></button>
-        {menuOpen && <div className="account-pop glass-card">
-          <div className="account-pop-head"><Avatar profile={profile} size="sm" /><div><b>{profile?.displayName || 'Ваш профиль'}</b><span>@{profile?.username || 'никнейм'}</span></div></div>
-          <Link href="/profile" onClick={() => setMenuOpen(false)}><Settings2 size={16} /> Изменить профиль</Link>
-          <button onClick={logout} data-testid="button-sign-out"><LogOut size={16} /> Выйти</button>
-        </div>}
-        <button className="mobile-menu-toggle" aria-label="Открыть меню" onClick={() => setMobileNav(!mobileNav)} data-testid="button-mobile-menu"><Menu size={20} /></button>
-      </div>
-    </aside>
-    {mobileNav && <div className="mobile-nav glass-card"><button className="close-mobile-nav" onClick={() => setMobileNav(false)} aria-label="Закрыть меню"><X size={19} /></button><Navigation compact onNavigate={() => setMobileNav(false)} /></div>}
+  const inConversation = path.startsWith('/chat/');
+  return <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`}>
     <div className="workspace-main">{children}</div>
+    <Navigation profile={profile} hidden={inConversation} />
   </div>;
 }
 
@@ -432,6 +453,113 @@ function StarsPage() {
   </div>;
 }
 
+function ContactsPage() {
+  const { user } = useAuth();
+  const [, setPath] = useLocation();
+  const [term, setTerm] = useState('');
+  const [error, setError] = useState('');
+  const normalizedTerm = term.trim().replace(/^@/, '');
+  const search = useUserSearch(normalizedTerm, user?.id || '');
+  const startConversation = useStartConversation(user?.id || '');
+  const canSearch = normalizedTerm.length >= 2;
+
+  async function openConversation(username: string) {
+    setError('');
+    try {
+      const conversationId = await startConversation.mutateAsync(username);
+      setPath(`/chat/${encodeURIComponent(conversationId)}`);
+    } catch (cause) {
+      setError(userError(cause, 'Не удалось начать переписку.'));
+    }
+  }
+
+  return <div className="page-content mono-page">
+    <PageHeader
+      kicker="ЛЮДИ MONO"
+      title="Контакты"
+      description="Найдите человека по имени пользователя и начните переписку."
+    />
+    <label className="mono-contact-search glass-card">
+      <Search size={18} />
+      <input
+        aria-label="Поиск контактов"
+        autoComplete="off"
+        onChange={(event) => setTerm(event.target.value)}
+        placeholder="Имя пользователя"
+        value={term}
+      />
+      {term && <button type="button" aria-label="Очистить поиск" onClick={() => setTerm('')}><X size={16} /></button>}
+    </label>
+    {error && <p className="mono-contact-error" role="alert">{error}</p>}
+    {!canSearch
+      ? <div className="mono-contact-hint"><CircleUserRound size={23} /><b>Поиск по имени пользователя</b><span>Введите не менее двух символов.</span></div>
+      : search.isLoading
+        ? <StateBlock title="Ищем контакты" detail="Подождите немного." />
+        : search.isError
+          ? <StateBlock title="Не удалось выполнить поиск" detail="Проверьте соединение и попробуйте ещё раз." action="Повторить" onAction={() => { void search.refetch(); }} />
+          : !search.data?.length
+            ? <StateBlock title="Никого не нашли" detail="Проверьте имя пользователя и попробуйте ещё раз." />
+            : <div className="mono-contact-list">
+              {search.data.map((person) => <button
+                className="mono-contact-result glass-card"
+                disabled={startConversation.isPending}
+                key={person.id}
+                onClick={() => { void openConversation(person.username); }}
+                type="button"
+              >
+                <Avatar profile={person} />
+                <span><b>{person.displayName}</b><small>@{person.username}</small></span>
+                <ArrowRight size={18} />
+              </button>)}
+            </div>}
+  </div>;
+}
+
+function SettingsPage() {
+  const { signOut } = useAuth();
+  const [error, setError] = useState('');
+
+  async function logout() {
+    setError('');
+    try {
+      await signOut();
+    } catch (cause) {
+      setError(userError(cause, 'Не удалось выйти из аккаунта.'));
+    }
+  }
+
+  return <div className="page-content mono-page">
+    <PageHeader
+      kicker="УПРАВЛЕНИЕ АККАУНТОМ"
+      title="Настройки"
+      description="Профиль, каналы и звёзды вашего аккаунта."
+    />
+    <section className="mono-settings-list glass-card" aria-label="Разделы приложения">
+      <Link className="mono-settings-row" href="/profile">
+        <span className="mono-settings-icon"><UserRound size={19} /></span>
+        <span><b>Профиль</b><small>Имя, имя пользователя и описание</small></span>
+        <ArrowRight size={17} />
+      </Link>
+      <Link className="mono-settings-row" href="/channels">
+        <span className="mono-settings-icon"><Compass size={19} /></span>
+        <span><b>Каналы</b><small>Публикации и подписки</small></span>
+        <ArrowRight size={17} />
+      </Link>
+      <Link className="mono-settings-row" href="/stars">
+        <span className="mono-settings-icon"><Star size={19} /></span>
+        <span><b>Звёзды Mono</b><small>Баланс и история операций</small></span>
+        <ArrowRight size={17} />
+      </Link>
+      <button className="mono-settings-row mono-settings-row--logout" onClick={() => { void logout(); }} type="button">
+        <span className="mono-settings-icon"><LogOut size={19} /></span>
+        <span><b>Выйти из аккаунта</b><small>Завершить текущий сеанс</small></span>
+        <ArrowRight size={17} />
+      </button>
+    </section>
+    {error && <p className="mono-contact-error" role="alert">{error}</p>}
+  </div>;
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth();
   if (loading) return <div className="boot-screen"><div className="boot-mark"><MessageCircle size={20}/></div><span>MONO</span><div className="boot-line"/></div>;
@@ -439,6 +567,8 @@ function AppRoutes() {
   return <AppShell><ErrorBoundary resetKey={window.location.pathname}><Switch>
     <Route path="/" component={ChatWorkspace}/>
     <Route path="/chat/:conversationId" component={ChatWorkspace}/>
+    <Route path="/contacts" component={ContactsPage}/>
+    <Route path="/settings" component={SettingsPage}/>
     <Route path="/channels" component={ChannelsPage}/>
     <Route path="/channels/:channelId" component={ChannelPage}/>
     <Route path="/profile" component={ProfilePage}/>
