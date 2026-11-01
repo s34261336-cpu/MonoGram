@@ -1,51 +1,36 @@
-# Telegram Messenger
+# MonoGram
 
-Responsive Telegram-inspired web messenger with a mock phone sign-in, sample chats, and live message delivery over Socket.IO. It is a demo: phone numbers are not verified, there is no SMS delivery, and messages are kept in server memory.
+Responsive Russian-language messenger with Supabase authentication, direct chats, channels, and realtime presence.
 
 ## Run locally
 
-From the repository root:
+Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the environment, then run:
 
 ```bash
-pnpm install
-pnpm --filter @workspace/api-server run build
-pnpm --filter @workspace/api-server run start
-```
-
-In another terminal, start the web preview:
-
-```bash
+pnpm install --frozen-lockfile
 pnpm --filter @workspace/telegram-messenger run dev
 ```
 
-Open the web preview. The frontend calls the API through `/api` and connects to Socket.IO at `/api/socket.io`. For a standalone production build:
+Build the frontend with:
 
 ```bash
 pnpm run build
-pnpm start
 ```
 
-The Node server serves the built frontend, JSON endpoints, and the Socket.IO connection on the same port. It uses `PORT` from the environment, falling back to `3000`.
+## Deploy to Vercel
 
-## Deploy to Render
+Import `s34261336-cpu/MonoGram` from GitHub into Vercel with the repository root (`.`) as the project root. `vercel.json` sets the install command, build command, static output directory, and SPA route fallback.
 
-Create a **Web Service** from the repository. Do not create a Static Site: the Node process must remain running for Socket.IO and the API.
+Add these environment variables in the Vercel project settings for Production and Preview deployments:
 
-Recommended settings:
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY` (the legacy `SUPABASE_ANON_KEY` is also accepted)
 
-- **Runtime:** Node
-- **Build command:** `corepack enable && pnpm install --frozen-lockfile && pnpm run build`
-- **Start command:** `pnpm start`
-- **Health check path:** `/api/healthz`
+Apply `supabase/schema.sql` to the Supabase project and add the Vercel production and preview URLs to Supabase Auth's allowed redirect URLs. The Vercel build serves the static frontend; authentication, app data, and realtime presence use Supabase.
 
-The React/Vite frontend is available from the repository root as `client/` and remains maintained as the `telegram-messenger` app package.
+## Behavior and limits
 
-Render provides `PORT` to the service. Do not set a fixed port. No database or secret is required for this demo.
-
-## Demo behavior and limits
-
-- The sign-in screen only stores a display name/phone locally; it does not send an SMS or authenticate an account.
-- Chats and sample messages are seeded in `server/chat-store.cjs`.
-- New messages are shared instantly with connected clients through Socket.IO.
-- In-memory messages reset when the service restarts and are not suitable for durable production messaging.
-- File and voice controls are demo UI actions; this project does not upload or store media.
+- Sign-in uses Supabase email and password authentication.
+- Direct messages, channels, and reactions are stored in Supabase.
+- Online status and database updates use Supabase Realtime.
+- File and voice controls are visual demo actions; media is not uploaded or stored.

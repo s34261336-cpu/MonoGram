@@ -254,7 +254,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function ChatWorkspace() {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [path, setPath] = useLocation();
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -266,7 +266,7 @@ function ChatWorkspace() {
   const chatsQuery = useChats(user?.id || '');
   const messagesQuery = useMessages(id, user?.id || '');
   const profileQuery = useProfile(user?.id || '');
-  const presence = usePresence(session?.access_token);
+  const presence = usePresence(user?.id);
   const chats = chatsQuery.data || [];
   const current = chats.find(c => c.id === id);
   const sendMessage = useSendMessage(user?.id || '');

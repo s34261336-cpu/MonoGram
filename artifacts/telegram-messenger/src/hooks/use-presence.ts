@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import { supabase } from '@/lib/supabase';
 
 export type PresenceState = {
   connected: boolean;
@@ -7,7 +7,7 @@ export type PresenceState = {
   onlineUserIds: string[];
 };
 
-export function usePresence(accessToken?: string | null): PresenceState {
+export function usePresence(userId?: string | null): PresenceState {
   const [state, setState] = useState<PresenceState>({
     connected: false,
     onlineCount: 0,
@@ -15,44 +15,47 @@ export function usePresence(accessToken?: string | null): PresenceState {
   });
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!userId || !supabase) {
       setState({ connected: false, onlineCount: 0, onlineUserIds: [] });
       return;
     }
 
-    const socket = io(window.location.origin, {
-      path: '/api/socket.io',
-      auth: { token: accessToken },
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 700,
-      reconnectionDelayMax: 6000,
+    const client = supabase;
+    const channel = client.channel('monogram-presence', {
+      config: { presence: { key: userId } },
     });
 
-    socket.on('connect', () => {
-      setState((current) => ({ ...current, connected: true }));
-    });
-    socket.on('disconnect', () => {
-      setState((current) => ({ ...current, connected: false }));
-    });
-    socket.on('connect_error', () => {
-      setState((current) => ({ ...current, connected: false }));
-    });
-    socket.on('presence:update', (payload: { onlineCount?: number; onlineUserIds?: string[] }) => {
-      setState((current) => ({
-        ...current,
-        onlineCount: Number.isFinite(payload.onlineCount) ? Number(payload.onlineCount) : current.onlineCount,
-        onlineUserIds: Array.isArray(payload.onlineUserIds)
-          ? payload.onlineUserIds.filter((id): id is string => typeof id === 'string')
-          : current.onlineUserIds,
-      }));
-    });
+    const syncPresence = () => {
+      const onlineUserIds = Object.keys(channel.presenceState());
+      setState({
+        connected: true,
+        onlineCount: onlineUserIds.length,
+        onlineUserIds,
+      });
+    };
+
+    channel
+      .on('presence', { event: 'sync' }, syncPresence)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try {
+            await channel.track({
+              userId,
+              onlineAt: new Date().toISOString(),
+            });
+            syncPresence();
+          } catch {
+            setState({ connected: false, onlineCount: 0, onlineUserIds: [] });
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setState({ connected: false, onlineCount: 0, onlineUserIds: [] });
+        }
+      });
 
     return () => {
-      socket.removeAllListeners();
-      socket.disconnect();
+      void client.removeChannel(channel);
     };
-  }, [accessToken]);
+  }, [userId]);
 
   return state;
 }
