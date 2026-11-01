@@ -55,11 +55,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     user: session?.user ?? null,
     loading,
     async signIn(email, password) {
-      const { error } = await requireSupabase().auth.signInWithPassword({
+      const { data, error } = await requireSupabase().auth.signInWithPassword({
         email: email.trim(),
         password,
       });
       if (error) throw error;
+      if (!data.user || !data.session) {
+        throw new Error('Supabase не подтвердил вход. Проверьте адрес, пароль и подтверждение почты.');
+      }
     },
     async signUp(email, password, displayName) {
       const { data, error } = await requireSupabase().auth.signUp({
