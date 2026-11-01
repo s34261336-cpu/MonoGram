@@ -5,8 +5,8 @@ import { logger } from "./lib/logger";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const chatStore = require("../../../server/chat-store.cjs") as {
-  getChats: () => unknown;
+const auth = require("../../../server/supabase-auth.cjs") as {
+  verifySupabaseUser: (accessToken: unknown) => Promise<{ id: string } | null>;
 };
 
 const rawPort = process.env["PORT"];
@@ -28,30 +28,40 @@ const io = new Server(server, {
   path: "/api/socket.io",
   cors: { origin: true, credentials: true },
 });
-app.set("io", io);
-const onlineUsers = new Map<string, string>();
+const onlineSocketsByUser = new Map<string, Set<string>>();
+
+io.use((socket, next) => {
+  void auth.verifySupabaseUser(socket.handshake.auth?.token).then((user) => {
+    if (!user) {
+      next(new Error("Unauthorized"));
+      return;
+    }
+    socket.data.userId = user.id;
+    next();
+  }).catch(() => next(new Error("Unauthorized")));
+});
 
 io.on("connection", (socket) => {
-  socket.emit("presence:update", { onlineCount: onlineUsers.size });
-
-  socket.on("presence:join", (payload: { displayName?: unknown } = {}) => {
-    const displayName =
-      typeof payload.displayName === "string"
-        ? payload.displayName.slice(0, 80)
-        : "Пользователь";
-    onlineUsers.set(socket.id, displayName);
-    io.emit("presence:update", {
-      onlineCount: onlineUsers.size,
-      users: [...new Set(onlineUsers.values())],
-    });
+  const userId = socket.data.userId as string;
+  const sockets = onlineSocketsByUser.get(userId) ?? new Set<string>();
+  sockets.add(socket.id);
+  onlineSocketsByUser.set(userId, sockets);
+  const broadcastPresence = (extra: Record<string, unknown> = {}) => io.emit("presence:update", {
+    onlineCount: onlineSocketsByUser.size,
+    onlineUserIds: [...onlineSocketsByUser.keys()],
+    ...extra,
   });
+  socket.emit("presence:update", {
+    onlineCount: onlineSocketsByUser.size,
+    onlineUserIds: [...onlineSocketsByUser.keys()],
+  });
+  broadcastPresence({ userId, online: true });
 
   socket.on("disconnect", () => {
-    onlineUsers.delete(socket.id);
-    io.emit("presence:update", {
-      onlineCount: onlineUsers.size,
-      users: [...new Set(onlineUsers.values())],
-    });
+    const current = onlineSocketsByUser.get(userId);
+    current?.delete(socket.id);
+    if (current?.size === 0) onlineSocketsByUser.delete(userId);
+    broadcastPresence({ userId, online: onlineSocketsByUser.has(userId) });
   });
 });
 

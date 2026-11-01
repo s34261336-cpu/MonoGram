@@ -2,7 +2,7 @@ const express = require("express");
 const http = require("node:http");
 const path = require("node:path");
 const { Server } = require("socket.io");
-const chatStore = require("./chat-store.cjs");
+const { verifySupabaseUser } = require("./supabase-auth.cjs");
 
 const app = express();
 const server = http.createServer(app);
@@ -10,7 +10,7 @@ const io = new Server(server, {
   path: "/api/socket.io",
   cors: { origin: true, credentials: true },
 });
-const onlineUsers = new Map();
+const onlineSocketsByUser = new Map();
 const publicDir = path.resolve(
   __dirname,
   "../artifacts/telegram-messenger/dist/public",
@@ -23,52 +23,14 @@ app.get("/api/healthz", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get("/api/chats", (_req, res) => {
-  res.json(chatStore.getChats());
-});
-
-app.get("/api/chats/:chatId/messages", (req, res) => {
-  const history = chatStore.getMessages(req.params.chatId);
-  if (!history) {
-    res.status(404).json({ error: "Чат не найден" });
+io.use(async (socket, next) => {
+  const user = await verifySupabaseUser(socket.handshake.auth?.token);
+  if (!user) {
+    next(new Error("Unauthorized"));
     return;
   }
-  res.json(history);
-});
-
-app.post("/api/messages", (req, res) => {
-  const { chatId, text, authorName, kind, fileName } = req.body || {};
-  const validKinds = ["text", "file", "voice"];
-  if (
-    typeof chatId !== "string" ||
-    typeof text !== "string" ||
-    !text.trim() ||
-    text.length > 4000 ||
-    typeof authorName !== "string" ||
-    !authorName.trim() ||
-    authorName.length > 80 ||
-    (kind !== undefined && !validKinds.includes(kind)) ||
-    (fileName !== undefined && typeof fileName !== "string")
-  ) {
-    res.status(400).json({ error: "Проверьте текст сообщения" });
-    return;
-  }
-
-  const message = chatStore.addMessage({
-    chatId,
-    text,
-    authorName,
-    kind: kind || "text",
-    fileName: fileName || null,
-  });
-  if (!message) {
-    res.status(404).json({ error: "Чат не найден" });
-    return;
-  }
-
-  io.emit("message:new", message);
-  io.emit("chats:update", chatStore.getChats());
-  res.status(201).json(message);
+  socket.data.userId = user.id;
+  next();
 });
 
 app.use("/api", (_req, res) => {
@@ -87,26 +49,26 @@ app.use((req, res, next) => {
 });
 
 io.on("connection", (socket) => {
-  socket.emit("presence:update", { onlineCount: onlineUsers.size });
-
-  socket.on("presence:join", (payload = {}) => {
-    const displayName =
-      typeof payload.displayName === "string"
-        ? payload.displayName.slice(0, 80)
-        : "Пользователь";
-    onlineUsers.set(socket.id, displayName);
-    io.emit("presence:update", {
-      onlineCount: onlineUsers.size,
-      users: [...new Set(onlineUsers.values())],
-    });
+  const userId = socket.data.userId;
+  const sockets = onlineSocketsByUser.get(userId) ?? new Set();
+  sockets.add(socket.id);
+  onlineSocketsByUser.set(userId, sockets);
+  const broadcastPresence = (extra = {}) => io.emit("presence:update", {
+    onlineCount: onlineSocketsByUser.size,
+    onlineUserIds: [...onlineSocketsByUser.keys()],
+    ...extra,
   });
+  socket.emit("presence:update", {
+    onlineCount: onlineSocketsByUser.size,
+    onlineUserIds: [...onlineSocketsByUser.keys()],
+  });
+  broadcastPresence({ userId, online: true });
 
   socket.on("disconnect", () => {
-    onlineUsers.delete(socket.id);
-    io.emit("presence:update", {
-      onlineCount: onlineUsers.size,
-      users: [...new Set(onlineUsers.values())],
-    });
+    const current = onlineSocketsByUser.get(userId);
+    current?.delete(socket.id);
+    if (current?.size === 0) onlineSocketsByUser.delete(userId);
+    broadcastPresence({ userId, online: onlineSocketsByUser.has(userId) });
   });
 });
 
