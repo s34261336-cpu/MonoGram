@@ -36,7 +36,7 @@ const transactionLabel = (reason: string) => ({
   channel_reaction: 'Отправка звёзд за публикацию',
 }[reason] || 'Операция со звёздами');
 
-function userError(error: unknown, fallback: string) {
+function userError(error: unknown, fallback: string, authMode?: 'login' | 'register') {
   const details = typeof error === 'object' && error !== null
     ? error as { message?: unknown; code?: unknown; status?: unknown }
     : {};
@@ -48,9 +48,11 @@ function userError(error: unknown, fallback: string) {
   if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд Mono.';
   if (/rate limit|too many attempts/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
   if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
-  if (status === 404) return 'Аккаунт не найден. Переключитесь на регистрацию.';
-  if (status === 409) return 'Этот номер уже зарегистрирован. Переключитесь на вход.';
+  if (status === 404 && authMode === 'register') return 'Не удалось завершить регистрацию. Проверьте настройки базы данных и попробуйте снова.';
+  if (status === 404 && authMode === 'login') return 'Аккаунт не найден. Переключитесь на регистрацию.';
+  if (status === 409 && authMode === 'register') return 'Этот номер уже зарегистрирован. Переключитесь на вход.';
   if (status === 401) return 'Сессия завершена. Войдите снова.';
+  if (status === 404 || status === 409) return fallback;
   if (/[А-Яа-яЁё]/.test(message)) return message;
   return fallback;
 }
@@ -115,7 +117,7 @@ function AuthScreen() {
     } catch (e) {
       setError(userError(e, mode === 'register'
         ? 'Не удалось создать аккаунт. Проверьте код и попробуйте снова.'
-        : 'Код не подошёл. Проверьте его и попробуйте снова.'));
+        : 'Код не подошёл. Проверьте его и попробуйте снова.', mode));
     } finally {
       setBusy(false);
     }
