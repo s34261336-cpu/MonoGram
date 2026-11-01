@@ -61,6 +61,7 @@ function userError(error: unknown, fallback: string) {
   if (/password.*(weak|short|characters)|at least \d+ characters/.test(normalized) || code === 'weak_password') return 'Пароль слишком короткий. Используйте не менее 8 символов.';
   if (/rate limit|too many requests/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
   if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
+  if (status === 401) return 'Supabase отказал в доступе. Проверьте, что адрес проекта (не адрес базы данных) и публичный ключ для приложения взяты из одного проекта.';
   if (/[А-Яа-яЁё]/.test(message)) return message;
   return fallback;
 }
