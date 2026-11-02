@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
@@ -36,10 +37,31 @@ app.use("/api", (_req, res) => {
   res.status(404).json({ error: "Маршрут API не найден." });
 });
 
-if (process.env["SERVE_WEB"] === "true") {
-  const webDirectory = fileURLToPath(
-    new URL("../../telegram-messenger/dist/public/", import.meta.url),
-  );
+const serverDirectory = path.dirname(fileURLToPath(import.meta.url));
+const webDirectoryCandidates = [
+  path.resolve(process.cwd(), "artifacts/telegram-messenger/dist/public"),
+  path.resolve(serverDirectory, "../../telegram-messenger/dist/public"),
+  path.resolve(process.cwd(), "artifacts/telegram-messenger/dist"),
+  path.resolve(serverDirectory, "../../telegram-messenger/dist"),
+];
+const webDirectory = webDirectoryCandidates.find((candidate) =>
+  existsSync(path.join(candidate, "index.html")),
+);
+const shouldServeWeb = Boolean(webDirectory);
+
+if (
+  process.env["SERVE_WEB"] === "true" ||
+  process.env["NODE_ENV"] === "production"
+) {
+  if (!webDirectory) {
+    throw new Error(
+      `Frontend build not found. Checked: ${webDirectoryCandidates.join(", ")}`,
+    );
+  }
+}
+
+if (shouldServeWeb && webDirectory) {
+  logger.info({ webDirectory }, "Serving web application");
   app.use(express.static(webDirectory));
   app.use((req, res, next) => {
     if (req.method !== "GET") {
