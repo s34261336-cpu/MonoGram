@@ -22,7 +22,25 @@ import './auth-screen.css';
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 12_000, retry: 1, refetchOnWindowFocus: true } } });
 const dateLabel = (value?: string) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: ru }) : '';
 const clock = (value?: string) => value ? format(new Date(value), 'HH:mm') : '';
-const initials = (name?: string) => (name || '?').trim().slice(0, 1).toUpperCase();
+const initials = (name?: string) => Array.from((name || '?').trim())[0]?.toUpperCase() || '?';
+const avatarPalette = [
+  ['#f1767e', '#d64c61'],
+  ['#ffa35e', '#e17442'],
+  ['#b18af2', '#7956c8'],
+  ['#65c88f', '#2e9167'],
+  ['#61c8d0', '#27899e'],
+  ['#79a8f8', '#456fc3'],
+  ['#e782b5', '#bd4f87'],
+] as const;
+function avatarColorIndex(profile?: Pick<Profile, 'id' | 'displayName'>) {
+  const seed = profile?.id || profile?.displayName || '?';
+  let hash = 2166136261;
+  for (const character of seed.toLocaleLowerCase()) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % avatarPalette.length;
+}
 const channelCountLabel = (count: number) => {
   const lastTwo = count % 100;
   const last = count % 10;
@@ -58,8 +76,15 @@ function userError(error: unknown, fallback: string, authMode?: 'login' | 'regis
   return fallback;
 }
 
-function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'displayName' | 'avatarUrl'>; size?: 'sm' | 'md' | 'lg' }) {
-  return <div className={`avatar avatar-${size}`} aria-label={profile?.displayName || 'Профиль'}>{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : initials(profile?.displayName)}</div>;
+function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'id' | 'displayName' | 'avatarUrl'>; size?: 'sm' | 'md' | 'lg' }) {
+  const [start, end] = avatarPalette[avatarColorIndex(profile)];
+  return <div
+    className={`avatar avatar-${size}`}
+    style={{ background: `linear-gradient(145deg, ${start}, ${end})`, color: '#fff' }}
+    aria-label={profile?.displayName || 'Профиль'}
+  >
+    {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : initials(profile?.displayName)}
+  </div>;
 }
 
 function AuthScreen() {
@@ -219,7 +244,7 @@ function AuthScreen() {
 }
 
 function Navigation({ profile, hidden = false }: {
-  profile?: Pick<Profile, 'displayName' | 'avatarUrl'>;
+  profile?: Pick<Profile, 'id' | 'displayName' | 'avatarUrl'>;
   hidden?: boolean;
 }) {
   const [path] = useLocation();
