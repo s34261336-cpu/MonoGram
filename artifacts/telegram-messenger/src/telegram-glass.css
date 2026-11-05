@@ -1688,3 +1688,204 @@ select:focus-visible {
     transition: none;
   }
 }
+
+.tg-profile-page {
+  min-height: 100%;
+  padding: 28px 18px calc(112px + env(safe-area-inset-bottom));
+  background: #0e1621;
+}
+
+.tg-profile {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.tg-profile-header {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  padding: 8px 0 20px;
+  text-align: center;
+}
+
+.tg-profile-avatar-wrap {
+  position: relative;
+  width: 104px;
+  height: 104px;
+}
+
+.tg-profile-avatar-wrap > .avatar {
+  width: 104px;
+  height: 104px;
+  font-size: 34px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .08);
+}
+
+.tg-profile-camera {
+  position: absolute;
+  right: -2px;
+  bottom: 0;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: white;
+  border: 3px solid #0e1621;
+  border-radius: 50%;
+  background: #2aabee;
+  cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+
+.tg-profile-camera:hover {
+  background: #168bd0;
+  transform: scale(1.05);
+}
+
+.tg-profile-header h1 {
+  margin: 15px 0 6px;
+  color: #f2f5f8;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+
+.tg-profile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  color: #9aa8b5;
+  border-radius: 999px;
+  background: #17212b;
+  font-size: 12px;
+}
+
+.tg-profile-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #64b5ef;
+}
+
+.tg-profile-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 2px 0 16px;
+}
+
+.tg-profile-actions button {
+  display: flex;
+  min-width: 0;
+  min-height: 68px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 5px;
+  color: #64b5ef;
+  border: 0;
+  border-radius: 12px;
+  background: #17212b;
+  cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+
+.tg-profile-actions button:hover {
+  background: #202e3a;
+  transform: translateY(-1px);
+}
+
+.tg-profile-actions button span {
+  color: #dce4eb;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tg-profile-card,
+.tg-profile-edit {
+  overflow: hidden;
+  padding: 2px 16px;
+  color: #e9eef3;
+  border: 0;
+  border-radius: 16px;
+  background: #17212b;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.tg-profile-info-row {
+  display: flex;
+  min-height: 70px;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 0;
+}
+
+.tg-profile-info-row + .tg-profile-info-row {
+  border-top: 1px solid rgba(194, 211, 226, .09);
+}
+
+.tg-profile-info-row p {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: #f1f4f7;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.tg-profile-info-row > span {
+  color: #8796a4;
+  font-size: 12px;
+}
+
+.tg-profile-info-row .tg-profile-username {
+  color: #64b5ef;
+}
+
+.tg-profile-edit {
+  margin-top: 14px;
+  padding: 18px 16px;
+}
+
+.tg-profile-edit h2 {
+  margin: 0 0 18px;
+  color: #edf3f7;
+  font-size: 17px;
+}
+
+.tg-profile-edit .form-stack {
+  gap: 14px;
+}
+
+.tg-profile-edit .form-stack input,
+.tg-profile-edit .form-stack textarea {
+  background: #0e1621;
+}
+
+@media (max-width: 680px) {
+  .tg-profile-page {
+    padding: 22px 16px calc(100px + env(safe-area-inset-bottom));
+  }
+
+  .tg-profile-header {
+    padding-top: 4px;
+  }
+
+  .tg-profile-actions {
+    gap: 7px;
+  }
+
+  .tg-profile-actions button {
+    min-height: 66px;
+  }
+
+  .tg-profile-actions button span {
+    font-size: 10px;
+  }
+}

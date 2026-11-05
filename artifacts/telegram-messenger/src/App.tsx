@@ -16,7 +16,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, ArrowRight, AtSign, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
@@ -519,27 +519,76 @@ function ChannelPage() {
 
 function ProfilePage() {
   const { user } = useAuth();
+  const [, setPath] = useLocation();
   const query = useProfile(user?.id || '');
   const save = useSaveProfile();
   const [saved,setSaved] = useState(false);
+  const [editing,setEditing] = useState(false);
   const form = useForm<{displayName:string;username:string;bio:string;avatarUrl:string}>({defaultValues:{displayName:'',username:'',bio:'',avatarUrl:''}});
   const profile = query.data;
   const initialized = useRef('');
   useEffect(()=>{if(profile && initialized.current !== profile.id){initialized.current=profile.id;form.reset({displayName:profile.displayName,username:profile.username,bio:profile.bio,avatarUrl:profile.avatarUrl||''});}},[profile,form]);
   async function submit(v:{displayName:string;username:string;bio:string;avatarUrl:string}){if(!user)return;setSaved(false);try{await save.mutateAsync({id:user.id,...v,avatarUrl:v.avatarUrl||null});setSaved(true);}catch(e){form.setError('root',{message:userError(e,'Не удалось сохранить профиль.')});}}
-  return <div className="page-content narrow-page"><PageHeader kicker="ВАША ЛИЧНОСТЬ" title="Профиль" description="Так вас будут находить и узнавать другие."/>
-    {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={()=>query.refetch()}/> : <><div className="profile-preview glass-card"><Avatar profile={profile} size="lg"/><div><span className="overline">ВАШ ПРОФИЛЬ MONOGRAM</span><h2>{profile?.displayName}</h2><span>@{profile?.username}</span></div><span className="profile-private"><Shield size={14}/> ЗАКРЫТЫЙ</span></div>
-    <section className="settings-card glass-card"><div className="settings-heading"><div><h2>Открытые сведения</h2><p>Показываются только выбранные вами данные.</p></div><CircleUserRound size={19}/></div>
+  function openPhotoEditor() {
+    setEditing(true);
+    window.requestAnimationFrame(() => {
+      const photoField = document.querySelector<HTMLInputElement>('[data-testid="input-profile-avatar"]');
+      photoField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      photoField?.focus();
+    });
+  }
+  return <div className="page-content tg-profile-page">
+    {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={()=>query.refetch()}/> : <main className="tg-profile">
+      <header className="tg-profile-header">
+        <div className="tg-profile-avatar-wrap">
+          <Avatar profile={profile} size="lg"/>
+          <button className="tg-profile-camera" type="button" onClick={openPhotoEditor} aria-label="Изменить фото профиля">
+            <Camera size={18}/>
+          </button>
+        </div>
+        <h1>{profile?.displayName || 'Пользователь'}</h1>
+        <span className="tg-profile-status"><i/>в сети</span>
+      </header>
+
+      <div className="tg-profile-actions" aria-label="Действия профиля">
+        <button type="button" onClick={openPhotoEditor} data-testid="button-profile-photo">
+          <Camera size={19}/><span>Выбрать фото</span>
+        </button>
+        <button type="button" onClick={() => setEditing(value => !value)} aria-expanded={editing} data-testid="button-edit-profile">
+          <PenLine size={19}/><span>{editing ? 'Готово' : 'Изменить'}</span>
+        </button>
+        <button type="button" onClick={() => setPath('/settings')} data-testid="button-profile-settings">
+          <Settings2 size={19}/><span>Настройки</span>
+        </button>
+      </div>
+
+      <section className="tg-profile-card glass-card" aria-label="Данные профиля">
+        <div className="tg-profile-info-row">
+          <p>+7 (XXX) XXX-XX-XX</p>
+          <span>Телефон</span>
+        </div>
+        <div className="tg-profile-info-row">
+          <p>{profile?.bio?.trim() || 'Добавьте пару слов о себе'}</p>
+          <span>О себе</span>
+        </div>
+        <div className="tg-profile-info-row">
+          <p className="tg-profile-username">@{profile?.username || 'username'}</p>
+          <span>Имя пользователя</span>
+        </div>
+      </section>
+
+      {editing && <section className="tg-profile-edit glass-card" aria-label="Редактирование профиля">
+        <h2>Редактировать профиль</h2>
       <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack profile-form">
         <FormField control={form.control} name="displayName" rules={{required:'Укажите отображаемое имя.'}} render={({field})=><FormItem><FormLabel>Отображаемое имя</FormLabel><FormControl><Input {...field} data-testid="input-profile-name"/></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="username" rules={{required:'Укажите имя пользователя.',pattern:{value:/^[a-z][a-z0-9_]{2,31}$/,message:'От 3 до 32 строчных латинских букв, цифр или знаков подчёркивания.'}}} render={({field})=><FormItem><FormLabel>Имя пользователя</FormLabel><FormControl><div className="input-prefix"><span>@</span><Input {...field} data-testid="input-profile-username"/></div></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="bio" render={({field})=><FormItem><FormLabel>О себе</FormLabel><FormControl><Textarea maxLength={280} placeholder="Пара слов о себе — если хотите." {...field} data-testid="input-profile-bio"/></FormControl><FormMessage/></FormItem>}/>
-        <FormField control={form.control} name="avatarUrl" render={({field})=><FormItem><FormLabel>Ссылка на изображение профиля</FormLabel><FormControl><Input type="url" placeholder="https://…" {...field} data-testid="input-profile-avatar"/></FormControl><FormMessage/></FormItem>}/>
-        <div className="privacy-note"><Shield size={17}/><div><b>Приватность MonoGram</b><p>Личные переписки видны только их участникам. Публикации открытых каналов доступны всем. Управление приватностью аккаунта пока не подключено к настройкам профиля.</p></div></div>
+        <FormField control={form.control} name="avatarUrl" render={({field})=><FormItem><FormLabel>Ссылка на фото профиля</FormLabel><FormControl><Input type="url" placeholder="https://…" {...field} data-testid="input-profile-avatar"/></FormControl><FormMessage/></FormItem>}/>
         {form.formState.errors.root&&<p className="form-error">{form.formState.errors.root.message}</p>}
         <div className="form-actions">{saved&&<span className="saved-note"><Check size={15}/> Изменения сохранены</span>}<Button className="primary-button" disabled={save.isPending} data-testid="button-save-profile">{save.isPending?'Сохраняем…':'Сохранить изменения'}</Button></div>
       </form></Form>
-    </section></>}
+      </section>}
+    </main>}
   </div>;
 }
 
