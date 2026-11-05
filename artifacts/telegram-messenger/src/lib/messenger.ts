@@ -16,12 +16,15 @@ export type DirectMessage = {
   authorUsername: string;
   content: string;
   createdAt: string;
+  isRead?: boolean;
+  readAt?: string | null;
 };
 
 export type Conversation = {
   id: string;
   person: Profile;
   lastMessage: DirectMessage | null;
+  unreadCount?: number;
 };
 
 export type Channel = {

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, Router as WouterRouter, Link, useLocation, useParams } from 'wouter';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, usePosts, useProfile, useSaveProfile, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
 import { usePresence } from '@/hooks/use-presence';
+import { useChatReadState } from '@/hooks/use-chat-read-state';
 import type { Channel, ChannelPost, Conversation, DirectMessage, Profile } from '@/lib/messenger';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, ArrowRight, AtSign, Check, ChevronDown, CircleUserRound, Compass, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
@@ -54,6 +55,7 @@ const transactionLabel = (reason: string) => ({
   welcome_bonus: 'Приветственный бонус',
   channel_reaction: 'Отправка звёзд за публикацию',
 }[reason] || 'Операция со звёздами');
+const UnreadChatsCountContext = createContext<(count: number) => void>(() => {});
 
 function userError(error: unknown, fallback: string, authMode?: 'request-code') {
   const details = typeof error === 'object' && error !== null
@@ -268,9 +270,10 @@ function AuthScreen() {
   </main>;
 }
 
-function Navigation({ profile, hidden = false }: {
+function Navigation({ profile, hidden = false, unreadChatsCount = 0 }: {
   profile?: Pick<Profile, 'id' | 'displayName' | 'avatarUrl'>;
   hidden?: boolean;
+  unreadChatsCount?: number;
 }) {
   const [path] = useLocation();
   const links = [
@@ -295,6 +298,9 @@ function Navigation({ profile, hidden = false }: {
       >
         <span className="mono-tab__icon">
           {href === '/profile' ? <Avatar profile={profile} size="sm" /> : <Icon size={26} strokeWidth={2.1} />}
+          {href === '/' && unreadChatsCount > 0 && <span className="mono-tab__badge" aria-label={`${unreadChatsCount} непрочитанных чатов`}>
+            {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
+          </span>}
         </span>
         <span className="mono-tab__label">{label}</span>
       </Link>;
@@ -305,20 +311,23 @@ function Navigation({ profile, hidden = false }: {
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [path] = useLocation();
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const profileQuery = useProfile(user?.id || '');
   const profile = profileQuery.data;
   const inConversation = path.startsWith('/chat/');
-  return <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`}>
-    <div className="workspace-main">{children}</div>
-    <Navigation profile={profile} hidden={inConversation} />
-  </div>;
+  return <UnreadChatsCountContext.Provider value={setUnreadChatsCount}>
+    <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`}>
+      <div className="workspace-main">{children}</div>
+      <Navigation profile={profile} hidden={inConversation} unreadChatsCount={unreadChatsCount} />
+    </div>
+  </UnreadChatsCountContext.Provider>;
 }
 
 function ChatWorkspace() {
   const { user } = useAuth();
   const [path, setPath] = useLocation();
   const [search, setSearch] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
+  const [showChatMenu, setShowChatMenu] = useState(false);
   const [showConversationDetails, setShowConversationDetails] = useState(false);
   const [username, setUsername] = useState('');
   const [newChat, setNewChat] = useState(false);
@@ -334,11 +343,18 @@ function ChatWorkspace() {
   const startConversation = useStartConversation(user?.id || '');
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
+  const setUnreadChatsCount = useContext(UnreadChatsCountContext);
+  const { markRead, unreadCountFor } = useChatReadState(user?.id || '');
   const endRef = useRef<HTMLDivElement>(null);
   const searchUsers = useUserSearch(username.replace(/^@/, ''), user?.id || '');
   const filtered = useMemo(() => chats.filter(c => `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`.toLowerCase().includes(search.toLowerCase())), [chats, search]);
+  const unreadChatsCount = chats.filter(chat => unreadCountFor(chat) > 0).length;
   useEffect(() => { setDraft(''); setError(''); }, [id]);
   useEffect(() => { if (messagesQuery.data?.length) endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messagesQuery.data?.length, id]);
+  useEffect(() => { setUnreadChatsCount(unreadChatsCount); }, [setUnreadChatsCount, unreadChatsCount]);
+  useEffect(() => {
+    if (id && current?.lastMessage) markRead(id);
+  }, [id, current?.lastMessage?.id, markRead]);
   async function send(e?: FormEvent) {
     e?.preventDefault();
     if (!user || !id || !draft.trim() || sendMessage.isPending) return;
@@ -355,18 +371,61 @@ function ChatWorkspace() {
   return <div className={`chat-layout ${id ? 'chat-open' : ''}`}>
     <aside className="chat-sidebar">
       <header className="chat-sidebar-head">
-        <div><span className="overline">ВАШЕ ПРОСТРАНСТВО</span><h1>Сообщения</h1></div>
-        <button className="round-action" onClick={() => setNewChat(true)} title="Начать переписку" aria-label="Начать переписку" data-testid="button-new-chat"><Plus size={19} /></button>
+        <h1>MonoGram</h1>
+        <div className="chat-header-actions">
+          <button
+            className="chat-menu-button"
+            onClick={() => setShowChatMenu(value => !value)}
+            title="Меню чатов"
+            aria-label="Меню чатов"
+            aria-expanded={showChatMenu}
+            data-testid="button-chat-menu"
+          >
+            <MoreVertical size={22} />
+          </button>
+          {showChatMenu && <div className="chat-header-menu" role="menu">
+            <button role="menuitem" onClick={() => { setNewChat(true); setShowChatMenu(false); }}>
+              <PenLine size={16} /> Новая переписка
+            </button>
+            <button role="menuitem" onClick={() => { setPath('/contacts'); setShowChatMenu(false); }}>
+              <CircleUserRound size={16} /> Контакты
+            </button>
+            <button role="menuitem" onClick={() => { setPath('/settings'); setShowChatMenu(false); }}>
+              <Settings2 size={16} /> Настройки
+            </button>
+          </div>}
+        </div>
       </header>
-      {showSearch && <div className="search-control"><Search size={16} /><input autoFocus aria-label="Поиск по перепискам" value={search} onChange={e => setSearch(e.target.value)} placeholder="Найти переписку" data-testid="input-chat-search" /><button onClick={() => { setSearch(''); setShowSearch(false); }} aria-label="Закрыть поиск"><X size={16} /></button></div>}
-      <div className="conversation-heading"><span>ЛИЧНЫЕ ПЕРЕПИСКИ</span><button onClick={() => setShowSearch(!showSearch)} aria-label="Искать сообщения" data-testid="button-search-chats"><Search size={16} /></button></div>
-      <div className="conversation-list">
-        {chatsQuery.isLoading ? <div className="list-skeleton">{[1,2,3,4].map(i => <div className="skeleton-chat" key={i}><i/><span/><b/></div>)}</div> : chatsQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => chatsQuery.refetch()} /> : filtered.length === 0 ? <div className="sidebar-empty"><div className="empty-mark"><MessageCircle size={19}/></div><b>{search ? 'Ничего не найдено' : 'Пока здесь тихо'}</b><p>{search ? 'Попробуйте другое имя или никнейм.' : 'Найдите человека по имени пользователя, чтобы начать личную переписку.'}</p>{!search && <button className="text-action" onClick={() => setNewChat(true)} data-testid="button-start-first-chat">Найти человека <ArrowLeft size={14}/></button>}</div> : filtered.map((chat: Conversation) => <button className={`conversation-row ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => setPath(`/chat/${encodeURIComponent(chat.id)}`)} data-testid={`conversation-${chat.id}`}>
-          <Avatar profile={chat.person} />
-          <span className="conversation-row-copy"><span className="row-title">{chat.person.displayName}<time>{clock(chat.lastMessage?.createdAt)}</time></span><span className="row-preview">{chat.lastMessage?.content || 'Сообщений пока нет'}</span><span className="row-username">@{chat.person.username}</span></span>
-        </button>)}
+      <div className="search-control chat-search">
+        <Search size={17} aria-hidden="true" />
+        <input aria-label="Поиск чатов" value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск чатов" data-testid="input-chat-search" />
+        {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск"><X size={16} /></button>}
       </div>
-       <div className="sidebar-bottom-note"><span className={`live-dot ${presence.connected ? '' : 'live-offline'}`} />{presence.connected ? `${presence.onlineCount} в сети` : 'Подключаемся…'}</div>
+      <div className="conversation-list">
+        {chatsQuery.isLoading ? <div className="list-skeleton">{[1,2,3,4].map(i => <div className="skeleton-chat" key={i}><i/><span/><b/></div>)}</div> : chatsQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => chatsQuery.refetch()} /> : filtered.length === 0 ? <div className="sidebar-empty"><div className="empty-mark"><MessageCircle size={19}/></div><b>{search ? 'Ничего не найдено' : 'Пока здесь тихо'}</b><p>{search ? 'Попробуйте другое имя или никнейм.' : 'Найдите человека по имени пользователя, чтобы начать личную переписку.'}</p>{!search && <button className="text-action" onClick={() => setNewChat(true)} data-testid="button-start-first-chat">Найти человека <ArrowLeft size={14}/></button>}</div> : filtered.map((chat: Conversation) => {
+          const unreadCount = unreadCountFor(chat);
+          const lastMessage = chat.lastMessage;
+          const isOwnMessage = lastMessage?.authorId === user?.id;
+          const isRead = lastMessage?.isRead === true || Boolean(lastMessage?.readAt);
+          return <button className={`conversation-row ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
+          <Avatar profile={chat.person} />
+          <span className="conversation-row-copy">
+            <span className="row-title"><span className="row-name">{chat.person.displayName}</span><time>{clock(lastMessage?.createdAt)}</time></span>
+            <span className="row-bottom">
+              <span className="row-preview">
+                {isOwnMessage && (isRead
+                  ? <CheckCheck size={16} className="row-read-check" aria-label="Прочитано" />
+                  : <Check size={14} className="row-sent-check" aria-label="Отправлено" />)}
+                <span className="row-preview-text">{lastMessage ? `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.content}` : 'Сообщений пока нет'}</span>
+              </span>
+              {unreadCount > 0 && <span className="conversation-unread" aria-label={`${unreadCount} непрочитанных`}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>}
+            </span>
+          </span>
+        </button>;
+        })}
+      </div>
     </aside>
     <section className="chat-stage">
       {current ? <>
@@ -381,6 +440,9 @@ function ChatWorkspace() {
         {error && <div className="inline-error" role="alert">{error}<button onClick={() => void send()} data-testid="button-retry-message">Попробовать снова</button></div>}
       </> : <div className="conversation-empty"><div className="empty-art"><div className="art-ring ring-a"/><div className="art-ring ring-b"/><span><MessageCircle size={28}/></span></div><span className="overline">MONOGRAM / ЛИЧНЫЕ СООБЩЕНИЯ</span><h2>Место для важных разговоров.</h2><p>Выберите переписку или найдите человека по имени пользователя.</p><button className="primary-button" onClick={() => setNewChat(true)} data-testid="button-find-person"><Plus size={16}/> Найти человека</button><div className="empty-caption">Здесь нет примеров переписок. Начните с первого сообщения.</div></div>}
     </section>
+    <button className="chat-compose-fab" type="button" onClick={() => setNewChat(true)} aria-label="Написать сообщение" title="Новое сообщение" data-testid="button-new-chat">
+      <PenLine size={22} />
+    </button>
      {newChat && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setNewChat(false); }}><section className="dialog glass-card"><button className="dialog-close" onClick={() => setNewChat(false)} aria-label="Закрыть"><X size={18}/></button><span className="overline">НАЧНИТЕ ЛИЧНУЮ ПЕРЕПИСКУ</span><h2>Найти по имени пользователя</h2><p>Введите точное имя пользователя латинскими буквами. Профиль останется закрытым, пока вы не напишете первым.</p><div className="username-input"><AtSign size={17}/><input autoFocus aria-label="Имя пользователя для поиска" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ''))} placeholder="имя пользователя" data-testid="input-find-username"/></div>
       {username.length >= 2 && <div className="user-results">{searchUsers.isLoading ? <div className="result-hint">Ищем людей…</div> : searchUsers.isError ? <div className="result-hint">Сейчас поиск недоступен.</div> : searchUsers.data?.length ? searchUsers.data.map(person => <button key={person.id} className="user-result" onClick={() => void beginChat(person.username)} data-testid={`user-result-${person.id}`}><Avatar profile={person} size="sm"/><span><b>{person.displayName}</b><small>@{person.username}</small></span><ArrowLeft size={15}/></button>) : <div className="result-hint">Пользователей с таким именем нет.</div>}</div>}
       {startError && <p className="form-error" role="alert">{startError}</p>}
