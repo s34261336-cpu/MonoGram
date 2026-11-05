@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useForm } from 'react-hook-form';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -102,6 +103,8 @@ function AuthScreen() {
   const [inputCode, setInputCode] = useState('');
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [error, setError] = useState('');
+  const [codeFeedback, setCodeFeedback] = useState<'idle' | 'error' | 'success'>('idle');
+  const [shakeKey, setShakeKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const formattedPhone = `+7 (${phoneDigits.slice(0, 3).padEnd(3, '_')}) ${phoneDigits.slice(3, 6).padEnd(3, '_')}-${phoneDigits.slice(6, 8).padEnd(2, '_')}-${phoneDigits.slice(8, 10).padEnd(2, '_')}`;
 
@@ -123,6 +126,7 @@ function AuthScreen() {
     try {
       setDemoCode(await requestDemoCode(`+7${phoneDigits}`));
       setInputCode('');
+      setCodeFeedback('idle');
       setStep('code');
     } catch (e) {
       if (isNetworkFailure(e)) {
@@ -135,21 +139,29 @@ function AuthScreen() {
   async function confirmCode(event: FormEvent) {
     event.preventDefault();
     if (inputCode.length !== 5) {
+      setCodeFeedback('error');
+      setShakeKey(current => current + 1);
       setError('Введите все пять цифр кода.');
       return;
     }
     setError('');
     setBusy(true);
     try {
-      await verifyDemoCode(`+7${phoneDigits}`, inputCode);
+      await verifyDemoCode(`+7${phoneDigits}`, inputCode, async () => {
+        setCodeFeedback('success');
+        const transitionDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 430;
+        await new Promise<void>(resolve => window.setTimeout(resolve, transitionDelay));
+      });
     } catch (e) {
+      setCodeFeedback('error');
+      setShakeKey(current => current + 1);
       setError(userError(e, 'Не удалось подтвердить код. Попробуйте ещё раз.'));
     } finally {
       setBusy(false);
     }
   }
 
-  return <main className="mono-auth">
+  return <main className={`mono-auth ${codeFeedback === 'success' ? 'mono-auth--success' : ''}`} data-step={step}>
     <div className="mono-auth__grid" aria-hidden="true" />
     <div className="mono-auth__glow mono-auth__glow--top" aria-hidden="true" />
     <div className="mono-auth__glow mono-auth__glow--bottom" aria-hidden="true" />
@@ -202,20 +214,45 @@ function AuthScreen() {
           </div>
           <div className="mono-auth__field">
             <label htmlFor="input-demo-code">Код из пяти цифр</label>
-            <div className="mono-auth__control mono-auth__control--code">
-              <input
+            <div
+              className="mono-auth__otp-frame"
+              data-feedback={codeFeedback}
+              data-shake={shakeKey % 2}
+            >
+              <InputOTP
                 id="input-demo-code"
-                autoComplete="one-time-code"
-                aria-label="Демо-код"
-                inputMode="numeric"
                 maxLength={5}
+                autoFocus
+                autoComplete="one-time-code"
+                aria-label="Код из пяти цифр"
+                aria-invalid={codeFeedback === 'error'}
+                inputMode="numeric"
                 value={inputCode}
-                onChange={event => setInputCode(event.target.value.replace(/\D/g, '').slice(0, 5))}
+                disabled={busy || codeFeedback === 'success'}
+                pasteTransformer={pasted => pasted.replace(/\D/g, '').slice(0, 5)}
+                onChange={value => {
+                  setInputCode(value.replace(/\D/g, '').slice(0, 5));
+                  if (codeFeedback === 'error') setCodeFeedback('idle');
+                  if (error) setError('');
+                }}
                 data-testid="input-demo-code"
-              />
+                containerClassName="mono-auth__otp"
+                className="mono-auth__otp-input"
+              >
+                <InputOTPGroup className="mono-auth__otp-group">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <InputOTPSlot
+                      key={index}
+                      index={index}
+                      className={`mono-auth__otp-slot ${inputCode[index] ? 'mono-auth__otp-slot--filled' : ''}`}
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
             </div>
           </div>
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
+          {codeFeedback === 'success' && <p className="mono-auth__success-message" role="status">Код подтверждён. Открываем чаты…</p>}
           <Button className="mono-auth__submit" type="submit" disabled={busy || inputCode.length !== 5} data-testid="button-confirm-code">
             {busy
               ? <><LoaderCircle className="spin" size={17} /> Проверяем</>
