@@ -370,7 +370,7 @@ function ChatWorkspace() {
   const messages = messagesQuery.data || [];
   return <div className={`chat-layout ${id ? 'chat-open' : ''}`}>
     <aside className="chat-sidebar">
-      <header className="chat-sidebar-head glass-surface">
+      <header className="chat-sidebar-head">
         <h1>MonoGram</h1>
         <div className="chat-header-actions">
           <button
@@ -407,7 +407,7 @@ function ChatWorkspace() {
           const lastMessage = chat.lastMessage;
           const isOwnMessage = lastMessage?.authorId === user?.id;
           const isRead = lastMessage?.isRead === true || Boolean(lastMessage?.readAt);
-          return <button className={`conversation-row glass-surface ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
+          return <button className={`conversation-row ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
           <Avatar profile={chat.person} />
           <span className="conversation-row-copy">
             <span className="row-title"><span className="row-name">{chat.person.displayName}</span><time>{clock(lastMessage?.createdAt)}</time></span>

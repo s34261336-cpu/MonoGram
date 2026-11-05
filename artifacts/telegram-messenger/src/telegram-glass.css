@@ -1949,8 +1949,8 @@ body,
 }
 
 .chat-sidebar-head {
-  margin: 14px 14px 12px;
-  padding: 17px 18px;
+  margin: 0;
+  padding: 24px 18px 17px;
 }
 
 .chat-search {
@@ -1966,28 +1966,29 @@ body,
 }
 
 .conversation-list {
-  gap: 8px;
-  padding: 4px 12px calc(130px + env(safe-area-inset-bottom));
+  gap: 0;
+  padding: 2px 8px calc(130px + env(safe-area-inset-bottom));
 }
 
 .conversation-row {
   min-height: 76px;
-  padding: 10px 12px;
-  border-radius: 20px;
-  background: var(--glass-surface-bg);
-  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: background .18s ease;
 }
 
 .conversation-row:hover {
-  border-color: rgba(255, 255, 255, .17);
-  background: rgba(31, 47, 62, .76);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, .045);
 }
 
 .conversation-row.row-selected {
-  border-color: rgba(100, 181, 239, .35);
-  background: rgba(39, 91, 128, .42);
-  box-shadow: inset 0 0 0 1px rgba(100, 181, 239, .08);
+  border: 0;
+  border-radius: 0;
+  background: rgba(49, 81, 107, .24);
+  box-shadow: none;
 }
 
 .chat-topbar {
