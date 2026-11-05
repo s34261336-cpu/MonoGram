@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type C
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, Router as WouterRouter, Link, useLocation, useParams } from 'wouter';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, usePosts, useProfile, useSaveProfile, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
+import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, usePosts, useProfile, useSaveProfile, useSaveProfileBio, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
 import { usePresence } from '@/hooks/use-presence';
 import { useChatReadState } from '@/hooks/use-chat-read-state';
 import type { Channel, ChannelPost, Conversation, DirectMessage, Profile } from '@/lib/messenger';
@@ -16,7 +16,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, ArrowRight, AtSign, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Copy, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
@@ -25,6 +25,14 @@ const client = new QueryClient({ defaultOptions: { queries: { staleTime: 12_000,
 const dateLabel = (value?: string) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: ru }) : '';
 const clock = (value?: string) => value ? format(new Date(value), 'HH:mm') : '';
 const initials = (name?: string) => Array.from((name || '?').trim())[0]?.toUpperCase() || '?';
+function formatPhone(phone?: string) {
+  const digits = (phone || '').replace(/\D/g, '');
+  const normalized = digits.length === 10 ? `7${digits}` : digits;
+  if (/^7\d{10}$/.test(normalized)) {
+    return `+7 (${normalized.slice(1, 4)}) ${normalized.slice(4, 7)}-${normalized.slice(7, 9)}-${normalized.slice(9, 11)}`;
+  }
+  return phone?.trim() || 'Номер не указан';
+}
 const avatarPalette = [
   ['#f1767e', '#d64c61'],
   ['#ffa35e', '#e17442'],
@@ -522,13 +530,69 @@ function ProfilePage() {
   const [, setPath] = useLocation();
   const query = useProfile(user?.id || '');
   const save = useSaveProfile();
+  const saveBio = useSaveProfileBio();
   const [saved,setSaved] = useState(false);
   const [editing,setEditing] = useState(false);
+  const [bioMenuOpen,setBioMenuOpen] = useState(false);
+  const [bioEditing,setBioEditing] = useState(false);
+  const [bioDraft,setBioDraft] = useState('');
+  const [bioError,setBioError] = useState('');
+  const [bioNotice,setBioNotice] = useState('');
+  const bioMenuRef = useRef<HTMLDivElement>(null);
   const form = useForm<{displayName:string;username:string;bio:string;avatarUrl:string}>({defaultValues:{displayName:'',username:'',bio:'',avatarUrl:''}});
   const profile = query.data;
   const initialized = useRef('');
   useEffect(()=>{if(profile && initialized.current !== profile.id){initialized.current=profile.id;form.reset({displayName:profile.displayName,username:profile.username,bio:profile.bio,avatarUrl:profile.avatarUrl||''});}},[profile,form]);
+  useEffect(() => {
+    if (!bioMenuOpen) return;
+    function closeMenu(event: PointerEvent) {
+      if (event.target instanceof Node && !bioMenuRef.current?.contains(event.target)) {
+        setBioMenuOpen(false);
+      }
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setBioMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', closeMenu);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeMenu);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [bioMenuOpen]);
   async function submit(v:{displayName:string;username:string;bio:string;avatarUrl:string}){if(!user)return;setSaved(false);try{await save.mutateAsync({id:user.id,...v,avatarUrl:v.avatarUrl||null});setSaved(true);}catch(e){form.setError('root',{message:userError(e,'Не удалось сохранить профиль.')});}}
+  function openBioEditor() {
+    setBioDraft(profile?.bio ?? '');
+    setBioError('');
+    setBioNotice('');
+    setBioMenuOpen(false);
+    setBioEditing(true);
+  }
+  async function copyBio() {
+    const bio = profile?.bio?.trim() ?? '';
+    setBioMenuOpen(false);
+    if (!bio) {
+      setBioNotice('Пока нечего копировать.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(bio);
+      setBioNotice('Текст «О себе» скопирован.');
+    } catch {
+      setBioNotice('Не удалось скопировать текст.');
+    }
+  }
+  async function submitBio(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user) return;
+    setBioError('');
+    try {
+      await saveBio.mutateAsync(bioDraft);
+      setBioEditing(false);
+    } catch (error) {
+      setBioError(userError(error, 'Не удалось сохранить текст «О себе».'));
+    }
+  }
   function openPhotoEditor() {
     setEditing(true);
     window.requestAnimationFrame(() => {
@@ -564,31 +628,98 @@ function ProfilePage() {
 
       <section className="tg-profile-card glass-card" aria-label="Данные профиля">
         <div className="tg-profile-info-row">
-          <p>+7 (XXX) XXX-XX-XX</p>
+          <p>{formatPhone(user?.phone)}</p>
           <span>Телефон</span>
         </div>
-        <div className="tg-profile-info-row">
-          <p>{profile?.bio?.trim() || 'Добавьте пару слов о себе'}</p>
-          <span>О себе</span>
+        <div className="tg-profile-info-row tg-profile-bio-row" ref={bioMenuRef}>
+          <button
+            className="tg-profile-bio-trigger"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={bioMenuOpen}
+            onClick={() => { setBioNotice(''); setBioMenuOpen(value => !value); }}
+            data-testid="button-profile-bio-menu"
+          >
+            <p>{profile?.bio?.trim() || 'Добавьте пару слов о себе'}</p>
+            <span>О себе</span>
+          </button>
+          {bioMenuOpen && <div className="tg-profile-bio-menu glass-card" role="menu" aria-label="Действия с текстом «О себе»">
+            <button type="button" role="menuitem" onClick={() => void copyBio()} data-testid="button-copy-profile-bio">
+              <Copy size={16}/><span>Копировать</span>
+            </button>
+            <button type="button" role="menuitem" onClick={openBioEditor} data-testid="button-edit-profile-bio">
+              <PenLine size={16}/><span>Изменить «О себе»</span>
+            </button>
+          </div>}
         </div>
         <div className="tg-profile-info-row">
           <p className="tg-profile-username">@{profile?.username || 'username'}</p>
           <span>Имя пользователя</span>
         </div>
       </section>
+      {bioNotice && <p className="tg-profile-bio-notice" role="status">{bioNotice}</p>}
 
       {editing && <section className="tg-profile-edit glass-card" aria-label="Редактирование профиля">
         <h2>Редактировать профиль</h2>
       <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack profile-form">
         <FormField control={form.control} name="displayName" rules={{required:'Укажите отображаемое имя.'}} render={({field})=><FormItem><FormLabel>Отображаемое имя</FormLabel><FormControl><Input {...field} data-testid="input-profile-name"/></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="username" rules={{required:'Укажите имя пользователя.',pattern:{value:/^[a-z][a-z0-9_]{2,31}$/,message:'От 3 до 32 строчных латинских букв, цифр или знаков подчёркивания.'}}} render={({field})=><FormItem><FormLabel>Имя пользователя</FormLabel><FormControl><div className="input-prefix"><span>@</span><Input {...field} data-testid="input-profile-username"/></div></FormControl><FormMessage/></FormItem>}/>
-        <FormField control={form.control} name="bio" render={({field})=><FormItem><FormLabel>О себе</FormLabel><FormControl><Textarea maxLength={280} placeholder="Пара слов о себе — если хотите." {...field} data-testid="input-profile-bio"/></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="avatarUrl" render={({field})=><FormItem><FormLabel>Ссылка на фото профиля</FormLabel><FormControl><Input type="url" placeholder="https://…" {...field} data-testid="input-profile-avatar"/></FormControl><FormMessage/></FormItem>}/>
         {form.formState.errors.root&&<p className="form-error">{form.formState.errors.root.message}</p>}
         <div className="form-actions">{saved&&<span className="saved-note"><Check size={15}/> Изменения сохранены</span>}<Button className="primary-button" disabled={save.isPending} data-testid="button-save-profile">{save.isPending?'Сохраняем…':'Сохранить изменения'}</Button></div>
       </form></Form>
       </section>}
     </main>}
+    {bioEditing && <div
+      className="tg-bio-modal-backdrop"
+      role="presentation"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget && !saveBio.isPending) setBioEditing(false);
+      }}
+    >
+      <section
+        className="tg-bio-editor glass-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tg-bio-editor-title"
+        onKeyDown={event => {
+          if (event.key === 'Escape' && !saveBio.isPending) setBioEditing(false);
+        }}
+      >
+        <header className="tg-bio-editor-header">
+          <div>
+            <span className="overline">ВАШ ПРОФИЛЬ</span>
+            <h2 id="tg-bio-editor-title">О себе</h2>
+          </div>
+          <div className="tg-bio-editor-actions">
+            <button type="button" className="tg-bio-close-button" aria-label="Закрыть" onClick={() => setBioEditing(false)} disabled={saveBio.isPending}>
+              <X size={19}/>
+            </button>
+            <button type="submit" form="tg-bio-editor-form" className="tg-bio-save-button" aria-label="Сохранить" title="Сохранить" disabled={saveBio.isPending} data-testid="button-save-profile-bio">
+              {saveBio.isPending ? <LoaderCircle size={19} className="spin"/> : <Check size={20}/>}
+            </button>
+          </div>
+        </header>
+        <form id="tg-bio-editor-form" onSubmit={event => void submitBio(event)} className="tg-bio-editor-form">
+          <label htmlFor="tg-bio-editor-input">Текст о себе</label>
+          <Textarea
+            id="tg-bio-editor-input"
+            value={bioDraft}
+            onChange={event => setBioDraft(event.target.value.slice(0, 280))}
+            maxLength={280}
+            rows={5}
+            placeholder="Пара слов о себе — если хотите."
+            autoFocus
+            data-testid="input-profile-bio"
+          />
+          <div className="tg-bio-editor-footer">
+            <span>{bioDraft.length}/280</span>
+            {saveBio.isPending && <span>Сохраняем…</span>}
+          </div>
+          {bioError && <p className="form-error" role="alert">{bioError}</p>}
+        </form>
+      </section>
+    </div>}
   </div>;
 }
 

@@ -76,6 +76,22 @@ router.get('/profile', handleRoute(async (req, res) => {
   res.json(toProfile(data as ProfileRow));
 }));
 
+router.patch('/profile/bio', handleRoute(async (req, res) => {
+  const id = userId(req);
+  if (typeof req.body?.bio !== 'string') {
+    throw apiError('Введите текст о себе.');
+  }
+  const bio = req.body.bio.trim().slice(0, 280);
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .update({ bio, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select(profileFields)
+    .single();
+  checkError(error);
+  res.json(toProfile(data as ProfileRow));
+}));
+
 router.patch('/profile', handleRoute(async (req, res) => {
   const id = userId(req);
   const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';

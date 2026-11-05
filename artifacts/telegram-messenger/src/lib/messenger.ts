@@ -81,6 +81,13 @@ export function saveProfile(input: {
   });
 }
 
+export function saveProfileBio(bio: string): Promise<Profile> {
+  return apiRequest('/api/messenger/profile/bio', {
+    method: 'PATCH',
+    body: json({ bio }),
+  });
+}
+
 export function searchUsers(term: string, _currentUserId: string): Promise<Profile[]> {
   return apiRequest(`/api/messenger/search?term=${encodeURIComponent(term)}`);
 }

@@ -10,6 +10,7 @@ import {
   getWallet,
   joinChannel,
   saveProfile,
+  saveProfileBio,
   searchUsers,
   sendMessage,
   sendStarReaction,
@@ -92,6 +93,17 @@ export function useSaveProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: saveProfile,
+    onSuccess: (profile) => {
+      queryClient.setQueryData(messengerKeys.profile(profile.id), profile);
+      void queryClient.invalidateQueries({ queryKey: messengerKeys.chats(profile.id) });
+    },
+  });
+}
+
+export function useSaveProfileBio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: saveProfileBio,
     onSuccess: (profile) => {
       queryClient.setQueryData(messengerKeys.profile(profile.id), profile);
       void queryClient.invalidateQueries({ queryKey: messengerKeys.chats(profile.id) });
