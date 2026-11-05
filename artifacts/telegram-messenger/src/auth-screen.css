@@ -353,32 +353,6 @@
 .mono-auth__submit svg:last-child { margin-left: auto; }
 .mono-auth__submit > svg:first-child:last-child { margin-left: 0; }
 
-.mono-auth__switch {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 18px;
-  color: #78909b;
-  font-size: 11px;
-  text-align: center;
-}
-
-.mono-auth__switch button {
-  padding: 5px 6px;
-  border: 0;
-  border-radius: 7px;
-  color: #2789ad;
-  background: transparent;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.mono-auth__switch button:hover { background: rgba(56, 157, 184, .09); }
-.mono-auth__switch button:focus-visible { outline: 2px solid #45aaca; outline-offset: 2px; }
-
 .mono-auth__foot {
   display: flex;
   align-items: center;

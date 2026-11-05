@@ -38,9 +38,14 @@ router.post('/auth/demo/verify-code', async (req, res, next) => {
   try {
     const phone = normalizeRuPhone(req.body?.phone);
     consumeDemoCode(phone, req.body?.code);
-    const userId = await findDemoUserId(phone);
+    let userId = await findDemoUserId(phone);
     if (!userId) {
-      throw authError('Аккаунт не найден. Создайте аккаунт, чтобы зарегистрироваться.', 404);
+      const { data, error } = await supabaseAdmin.rpc('get_or_create_demo_user', {
+        p_phone: phone,
+      });
+      if (error) throw error;
+      if (typeof data !== 'string') throw new Error('Не удалось создать профиль MonoGram.');
+      userId = data;
     }
     const user = { id: userId, phone };
     res.json({ user, sessionToken: createDemoSession(user) });
@@ -62,7 +67,7 @@ router.post('/auth/demo/register', async (req, res, next) => {
       p_phone: phone,
     });
     if (error) throw error;
-    if (typeof data !== 'string') throw new Error('Не удалось создать профиль Mono.');
+    if (typeof data !== 'string') throw new Error('Не удалось создать профиль MonoGram.');
     const user = { id: data, phone };
     res.status(201).json({ user, sessionToken: createDemoSession(user) });
   } catch (error) {

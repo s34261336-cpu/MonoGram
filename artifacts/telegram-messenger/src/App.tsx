@@ -54,7 +54,7 @@ const transactionLabel = (reason: string) => ({
   channel_reaction: 'Отправка звёзд за публикацию',
 }[reason] || 'Операция со звёздами');
 
-function userError(error: unknown, fallback: string, authMode?: 'login' | 'register' | 'request-code') {
+function userError(error: unknown, fallback: string, authMode?: 'request-code') {
   const details = typeof error === 'object' && error !== null
     ? error as { message?: unknown; code?: unknown; status?: unknown }
     : {};
@@ -63,17 +63,25 @@ function userError(error: unknown, fallback: string, authMode?: 'login' | 'regis
     : typeof details.message === 'string' ? details.message : '';
   const status = typeof details.status === 'number' ? details.status : 0;
   const normalized = message.toLowerCase();
-  if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд Mono.';
+  if (/недостаточно monostars/.test(normalized)) return 'Недостаточно звёзд MonoGram.';
   if (/rate limit|too many attempts/.test(normalized) || status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова.';
-  if (/failed to fetch|network|fetch error/.test(normalized) || status === 503) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
+  if (/failed to fetch|network|fetch error|load failed/.test(normalized) || status === 0 || (status >= 502 && status <= 504)) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
   if (status === 404 && authMode === 'request-code') return 'Сервис выдачи демо-кода не найден. Обновите страницу и попробуйте снова.';
-  if (status === 404 && authMode === 'register') return 'Не удалось завершить регистрацию. Проверьте настройки базы данных и попробуйте снова.';
-  if (status === 404 && authMode === 'login') return 'Аккаунт не найден. Переключитесь на регистрацию.';
-  if (status === 409 && authMode === 'register') return 'Этот номер уже зарегистрирован. Переключитесь на вход.';
   if (status === 401) return 'Сессия завершена. Войдите снова.';
   if (status === 404 || status === 409) return fallback;
   if (/[А-Яа-яЁё]/.test(message)) return message;
   return fallback;
+}
+
+function isNetworkFailure(error: unknown) {
+  const details = typeof error === 'object' && error !== null
+    ? error as { message?: unknown; status?: unknown }
+    : {};
+  const message = typeof details.message === 'string' ? details.message.toLowerCase() : '';
+  const status = typeof details.status === 'number' ? details.status : 0;
+  return /failed to fetch|network|fetch error|load failed/.test(message)
+    || status === 0
+    || (status >= 502 && status <= 504);
 }
 
 function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'id' | 'displayName' | 'avatarUrl'>; size?: 'sm' | 'md' | 'lg' }) {
@@ -88,8 +96,7 @@ function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'id' | 'disp
 }
 
 function AuthScreen() {
-  const { requestDemoCode, verifyDemoCode, registerDemoAccount } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const { requestDemoCode, verifyDemoCode } = useAuth();
   const [phoneDigits, setPhoneDigits] = useState('');
   const [demoCode, setDemoCode] = useState('');
   const [inputCode, setInputCode] = useState('');
@@ -110,10 +117,7 @@ function AuthScreen() {
 
   async function requestCode(event: FormEvent) {
     event.preventDefault();
-    if (phoneDigits.length !== 10) {
-      setError('Введите номер полностью.');
-      return;
-    }
+    if (phoneDigits.length !== 10) return;
     setError('');
     setBusy(true);
     try {
@@ -121,7 +125,9 @@ function AuthScreen() {
       setInputCode('');
       setStep('code');
     } catch (e) {
-      setError(userError(e, 'Не удалось получить демо-код. Попробуйте ещё раз.', 'request-code'));
+      if (isNetworkFailure(e)) {
+        setError(userError(e, 'Не удалось подключиться. Проверьте интернет и попробуйте снова.', 'request-code'));
+      }
     }
     finally { setBusy(false); }
   }
@@ -135,15 +141,9 @@ function AuthScreen() {
     setError('');
     setBusy(true);
     try {
-      if (mode === 'register') {
-        await registerDemoAccount(`+7${phoneDigits}`, inputCode);
-      } else {
-        await verifyDemoCode(`+7${phoneDigits}`, inputCode);
-      }
+      await verifyDemoCode(`+7${phoneDigits}`, inputCode);
     } catch (e) {
-      setError(userError(e, mode === 'register'
-        ? 'Не удалось создать аккаунт. Проверьте код и попробуйте снова.'
-        : 'Код не подошёл. Проверьте его и попробуйте снова.', mode));
+      setError(userError(e, 'Не удалось подтвердить код. Попробуйте ещё раз.'));
     } finally {
       setBusy(false);
     }
@@ -155,24 +155,22 @@ function AuthScreen() {
     <div className="mono-auth__glow mono-auth__glow--bottom" aria-hidden="true" />
     <div className="mono-auth__shell">
       <section className="mono-auth__card" aria-labelledby="mono-auth-title">
-        <a className="mono-auth__mobile-brand" href="/" aria-label="Mono — главная">
+        <a className="mono-auth__mobile-brand" href="/" aria-label="MonoGram — главная">
           <span className="mono-auth__brand-icon"><MessageCircle size={20} strokeWidth={2.2} /></span>
-          <span>Mono</span>
+          <span>MonoGram</span>
         </a>
         <div className="mono-auth__card-meta">
           <span className="mono-auth__eyebrow">{step === 'phone'
-            ? mode === 'login' ? 'БЫСТРЫЙ ВХОД' : 'РЕГИСТРАЦИЯ'
+            ? 'ВХОД И РЕГИСТРАЦИЯ'
             : 'ПОДТВЕРЖДЕНИЕ НОМЕРА'}</span>
-          <span className="mono-auth__secure"><Shield size={14} /> Mono Messenger</span>
+          <span className="mono-auth__secure"><Shield size={14} /> MonoGram Messenger</span>
         </div>
         <header className="mono-auth__intro">
           <h1 id="mono-auth-title">{step === 'phone'
-            ? mode === 'login' ? 'Войти в Mono' : 'Создать аккаунт'
+            ? 'Ваш номер телефона'
             : 'Введите код'}</h1>
           <p>{step === 'phone'
-            ? mode === 'login'
-              ? 'Укажите номер телефона, чтобы открыть свои чаты.'
-              : 'Укажите номер телефона, чтобы создать аккаунт и начать общаться.'
+            ? 'Пожалуйста, подтвердите код страны и введите номер телефона.'
             : `Код для номера ${formattedPhone}. SMS не отправляется — это демо-вход.`}</p>
         </header>
 
@@ -194,12 +192,12 @@ function AuthScreen() {
           </div>
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
           <Button className="mono-auth__submit" type="submit" disabled={busy || phoneDigits.length !== 10} data-testid="button-request-code">
-            {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>{mode === 'login' ? 'Далее' : 'Продолжить регистрацию'} <ArrowRight size={17} /></>}
+            {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>Далее <ArrowRight size={17} /></>}
           </Button>
           <p className="mono-auth__hint">На этом демо-этапе код появится на экране, SMS не отправляется.</p>
         </form> : <form className="mono-auth__form" onSubmit={confirmCode}>
           <div className="mono-auth__demo-code" role="status" data-testid="demo-code">
-            <span>{mode === 'login' ? 'Ваш демо-код входа' : 'Ваш демо-код регистрации'}</span>
+            <span>Ваш демо-код</span>
             <strong>{demoCode}</strong>
           </div>
           <div className="mono-auth__field">
@@ -220,23 +218,13 @@ function AuthScreen() {
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
           <Button className="mono-auth__submit" type="submit" disabled={busy || inputCode.length !== 5} data-testid="button-confirm-code">
             {busy
-              ? <><LoaderCircle className="spin" size={17} /> {mode === 'login' ? 'Проверяем' : 'Создаём аккаунт'}</>
-              : <>{mode === 'login' ? 'Войти' : 'Зарегистрироваться'} <Check size={17} /></>}
+              ? <><LoaderCircle className="spin" size={17} /> Проверяем</>
+              : <>Подтвердить <Check size={17} /></>}
           </Button>
           <button className="mono-auth__back" type="button" onClick={() => { setError(''); setStep('phone'); }} data-testid="button-edit-phone">
             <ArrowLeft size={15} /> Изменить номер
           </button>
         </form>}
-        {step === 'phone' && <p className="mono-auth__switch">
-          {mode === 'login' ? 'Впервые в Mono?' : 'Уже есть аккаунт?'}
-          <button
-            type="button"
-            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
-            data-testid="button-toggle-auth-mode"
-          >
-            {mode === 'login' ? 'Создать аккаунт' : 'Войти'}
-          </button>
-        </p>}
         <footer className="mono-auth__foot"><Shield size={15} /><span>Демо-режим: SMS не отправляется</span></footer>
       </section>
     </div>
@@ -354,7 +342,7 @@ function ChatWorkspace() {
         </div>
         <form className="composer" onSubmit={send}><textarea aria-label="Текст сообщения" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder="Напишите сообщение…" maxLength={4000} rows={1} data-testid="input-message" /><span className="composer-count">{draft.length ? `${draft.length}/4000` : 'Ввод — отправить'}</span><button className="send-circle" type="submit" disabled={!draft.trim() || sendMessage.isPending} aria-label="Отправить сообщение" data-testid="button-send-message">{sendMessage.isPending ? <LoaderCircle className="spin" size={17}/> : <Send size={17}/>}</button></form>
         {error && <div className="inline-error" role="alert">{error}<button onClick={() => void send()} data-testid="button-retry-message">Попробовать снова</button></div>}
-      </> : <div className="conversation-empty"><div className="empty-art"><div className="art-ring ring-a"/><div className="art-ring ring-b"/><span><MessageCircle size={28}/></span></div><span className="overline">MONO / ЛИЧНЫЕ СООБЩЕНИЯ</span><h2>Место для важных разговоров.</h2><p>Выберите переписку или найдите человека по имени пользователя.</p><button className="primary-button" onClick={() => setNewChat(true)} data-testid="button-find-person"><Plus size={16}/> Найти человека</button><div className="empty-caption">Здесь нет примеров переписок. Начните с первого сообщения.</div></div>}
+      </> : <div className="conversation-empty"><div className="empty-art"><div className="art-ring ring-a"/><div className="art-ring ring-b"/><span><MessageCircle size={28}/></span></div><span className="overline">MONOGRAM / ЛИЧНЫЕ СООБЩЕНИЯ</span><h2>Место для важных разговоров.</h2><p>Выберите переписку или найдите человека по имени пользователя.</p><button className="primary-button" onClick={() => setNewChat(true)} data-testid="button-find-person"><Plus size={16}/> Найти человека</button><div className="empty-caption">Здесь нет примеров переписок. Начните с первого сообщения.</div></div>}
     </section>
      {newChat && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setNewChat(false); }}><section className="dialog glass-card"><button className="dialog-close" onClick={() => setNewChat(false)} aria-label="Закрыть"><X size={18}/></button><span className="overline">НАЧНИТЕ ЛИЧНУЮ ПЕРЕПИСКУ</span><h2>Найти по имени пользователя</h2><p>Введите точное имя пользователя латинскими буквами. Профиль останется закрытым, пока вы не напишете первым.</p><div className="username-input"><AtSign size={17}/><input autoFocus aria-label="Имя пользователя для поиска" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ''))} placeholder="имя пользователя" data-testid="input-find-username"/></div>
       {username.length >= 2 && <div className="user-results">{searchUsers.isLoading ? <div className="result-hint">Ищем людей…</div> : searchUsers.isError ? <div className="result-hint">Сейчас поиск недоступен.</div> : searchUsers.data?.length ? searchUsers.data.map(person => <button key={person.id} className="user-result" onClick={() => void beginChat(person.username)} data-testid={`user-result-${person.id}`}><Avatar profile={person} size="sm"/><span><b>{person.displayName}</b><small>@{person.username}</small></span><ArrowLeft size={15}/></button>) : <div className="result-hint">Пользователей с таким именем нет.</div>}</div>}
@@ -400,7 +388,7 @@ function ChannelsPage() {
   </div>;
 }
 function ChannelCard({ channel, index }: {channel: Channel; index:number}) {
-  return <Link href={`/channels/${channel.id}`} className="channel-card glass-card" data-testid={`channel-card-${channel.id}`}><div className="channel-card-top"><span className={`channel-monogram tone-${index % 4}`}><Hash size={21}/></span><span className="channel-member">{channel.isMember ? 'ВЫ ПОДПИСАНЫ' : 'ОТКРЫТЫЙ'}</span></div><h2>{channel.title}</h2><span className="channel-handle">@{channel.username}</span><p>{channel.description || 'Канал Mono.'}</p><div className="channel-card-bottom"><span>Открыть канал</span><ArrowLeft size={15}/></div></Link>;
+  return <Link href={`/channels/${channel.id}`} className="channel-card glass-card" data-testid={`channel-card-${channel.id}`}><div className="channel-card-top"><span className={`channel-monogram tone-${index % 4}`}><Hash size={21}/></span><span className="channel-member">{channel.isMember ? 'ВЫ ПОДПИСАНЫ' : 'ОТКРЫТЫЙ'}</span></div><h2>{channel.title}</h2><span className="channel-handle">@{channel.username}</span><p>{channel.description || 'Канал MonoGram.'}</p><div className="channel-card-bottom"><span>Открыть канал</span><ArrowLeft size={15}/></div></Link>;
 }
 
 function ChannelPage() {
@@ -423,10 +411,10 @@ function ChannelPage() {
   if (channelsQuery.isLoading) return <div className="page-content"><div className="loading-panel glass-card"><i/><b/><span/></div></div>;
   if (!channel) return <div className="page-content"><StateBlock title="Канал не найден" detail="Возможно, его удалили или ссылка неверна."/><Link href="/channels" className="text-action">Вернуться к каналам</Link></div>;
   return <div className="page-content channel-page">
-    <div className="channel-hero glass-card"><Link href="/channels" className="back-link"><ArrowLeft size={15}/> Все каналы</Link><div className="channel-hero-mark"><Hash size={25}/></div><span className="overline">КАНАЛ / @{channel.username}</span><h1>{channel.title}</h1><p>{channel.description || 'Открытый канал Mono.'}</p><div className="channel-hero-actions">{channel.isMember ? <span className="member-status"><Check size={15}/> Вы подписаны</span> : <button className="primary-button" onClick={() => join.mutate(channelId)} disabled={join.isPending} data-testid="button-join-channel">{join.isPending ? 'Подписываем…' : 'Подписаться'}</button>}<span className="star-balance"><Star size={15}/>{wallet.data?.balance ?? '—'} звёзд Mono</span></div></div>
+    <div className="channel-hero glass-card"><Link href="/channels" className="back-link"><ArrowLeft size={15}/> Все каналы</Link><div className="channel-hero-mark"><Hash size={25}/></div><span className="overline">КАНАЛ / @{channel.username}</span><h1>{channel.title}</h1><p>{channel.description || 'Открытый канал MonoGram.'}</p><div className="channel-hero-actions">{channel.isMember ? <span className="member-status"><Check size={15}/> Вы подписаны</span> : <button className="primary-button" onClick={() => join.mutate(channelId)} disabled={join.isPending} data-testid="button-join-channel">{join.isPending ? 'Подписываем…' : 'Подписаться'}</button>}<span className="star-balance"><Star size={15}/>{wallet.data?.balance ?? '—'} звёзд MonoGram</span></div></div>
       {channel.role === 'owner' && <form className="publish-box glass-card" onSubmit={publish}><Textarea aria-label="Текст публикации" value={body} onChange={e=>setBody(e.target.value)} maxLength={4000} placeholder="Поделитесь новостью с подписчиками…" data-testid="input-channel-post"/>{postError&&<p className="form-error" role="alert">{postError}</p>}<div><span>{body.length}/4000</span><button className="primary-button" disabled={!body.trim() || createPost.isPending} data-testid="button-publish-post">{createPost.isPending ? 'Публикуем…' : 'Опубликовать'}<Send size={15}/></button></div></form>}
     <div className="posts-heading"><div><span className="overline">ПУБЛИКАЦИИ</span><h2>Последние записи</h2></div><span>{postsQuery.data?.length ?? ''}</span></div>
-    {postsQuery.isLoading ? <div className="post-skeleton glass-card"><i/><span/><b/><span/></div> : postsQuery.isError ? <StateBlock title="Не удалось загрузить записи" detail="Попробуйте ещё раз через минуту." action="Повторить" onAction={() => postsQuery.refetch()}/> : !postsQuery.data?.length ? <div className="empty-panel compact-empty"><div className="empty-mark"><MessageCircle size={19}/></div><h2>Записей пока нет</h2><p>{channel.isMember ? 'Опубликуйте первую запись.' : 'Подпишитесь на канал, чтобы видеть новые записи.'}</p></div> : <div className="post-list">{postsQuery.data.map((post:ChannelPost)=><article className="post-card glass-card" key={post.id} data-testid={`post-${post.id}`}><div className="post-byline"><span className="author-mark">{initials(post.authorName)}</span><div><b>{post.authorName}</b><small>@{post.authorUsername} · {dateLabel(post.createdAt)}</small></div><button className={`stars-react ${post.myStars ? 'reacted' : ''}`} onClick={()=>{setStarsTarget(starsTarget===post.id?'':post.id);setReactionError('');}} aria-label="Отправить звёзды Mono" data-testid={`button-react-${post.id}`}><Star size={16}/><span>{post.starsTotal}</span></button></div><p className="post-body">{post.body}</p>{starsTarget===post.id && <div className="reaction-panel"><label>Отправить звёзды</label><select aria-label="Количество звёзд для отправки" value={stars} onChange={e=>setStars(e.target.value)} data-testid={`select-stars-${post.id}`}><option value="1">1 звезда</option><option value="5">5 звёзд</option><option value="10">10 звёзд</option><option value="25">25 звёзд</option></select><span>Баланс: {wallet.data?.balance ?? 0}</span><button onClick={()=>void sendReaction(post.id)} disabled={sendStars.isPending} data-testid={`button-send-stars-${post.id}`}>{sendStars.isPending?'Отправляем…':'Отправить'}</button>{reactionError&&<small className="form-error">{reactionError}</small>}</div>}</article>)}</div>}
+    {postsQuery.isLoading ? <div className="post-skeleton glass-card"><i/><span/><b/><span/></div> : postsQuery.isError ? <StateBlock title="Не удалось загрузить записи" detail="Попробуйте ещё раз через минуту." action="Повторить" onAction={() => postsQuery.refetch()}/> : !postsQuery.data?.length ? <div className="empty-panel compact-empty"><div className="empty-mark"><MessageCircle size={19}/></div><h2>Записей пока нет</h2><p>{channel.isMember ? 'Опубликуйте первую запись.' : 'Подпишитесь на канал, чтобы видеть новые записи.'}</p></div> : <div className="post-list">{postsQuery.data.map((post:ChannelPost)=><article className="post-card glass-card" key={post.id} data-testid={`post-${post.id}`}><div className="post-byline"><span className="author-mark">{initials(post.authorName)}</span><div><b>{post.authorName}</b><small>@{post.authorUsername} · {dateLabel(post.createdAt)}</small></div><button className={`stars-react ${post.myStars ? 'reacted' : ''}`} onClick={()=>{setStarsTarget(starsTarget===post.id?'':post.id);setReactionError('');}} aria-label="Отправить звёзды MonoGram" data-testid={`button-react-${post.id}`}><Star size={16}/><span>{post.starsTotal}</span></button></div><p className="post-body">{post.body}</p>{starsTarget===post.id && <div className="reaction-panel"><label>Отправить звёзды</label><select aria-label="Количество звёзд для отправки" value={stars} onChange={e=>setStars(e.target.value)} data-testid={`select-stars-${post.id}`}><option value="1">1 звезда</option><option value="5">5 звёзд</option><option value="10">10 звёзд</option><option value="25">25 звёзд</option></select><span>Баланс: {wallet.data?.balance ?? 0}</span><button onClick={()=>void sendReaction(post.id)} disabled={sendStars.isPending} data-testid={`button-send-stars-${post.id}`}>{sendStars.isPending?'Отправляем…':'Отправить'}</button>{reactionError&&<small className="form-error">{reactionError}</small>}</div>}</article>)}</div>}
   </div>;
 }
 
@@ -441,14 +429,14 @@ function ProfilePage() {
   useEffect(()=>{if(profile && initialized.current !== profile.id){initialized.current=profile.id;form.reset({displayName:profile.displayName,username:profile.username,bio:profile.bio,avatarUrl:profile.avatarUrl||''});}},[profile,form]);
   async function submit(v:{displayName:string;username:string;bio:string;avatarUrl:string}){if(!user)return;setSaved(false);try{await save.mutateAsync({id:user.id,...v,avatarUrl:v.avatarUrl||null});setSaved(true);}catch(e){form.setError('root',{message:userError(e,'Не удалось сохранить профиль.')});}}
   return <div className="page-content narrow-page"><PageHeader kicker="ВАША ЛИЧНОСТЬ" title="Профиль" description="Так вас будут находить и узнавать другие."/>
-    {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={()=>query.refetch()}/> : <><div className="profile-preview glass-card"><Avatar profile={profile} size="lg"/><div><span className="overline">ВАШ ПРОФИЛЬ MONO</span><h2>{profile?.displayName}</h2><span>@{profile?.username}</span></div><span className="profile-private"><Shield size={14}/> ЗАКРЫТЫЙ</span></div>
+    {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={()=>query.refetch()}/> : <><div className="profile-preview glass-card"><Avatar profile={profile} size="lg"/><div><span className="overline">ВАШ ПРОФИЛЬ MONOGRAM</span><h2>{profile?.displayName}</h2><span>@{profile?.username}</span></div><span className="profile-private"><Shield size={14}/> ЗАКРЫТЫЙ</span></div>
     <section className="settings-card glass-card"><div className="settings-heading"><div><h2>Открытые сведения</h2><p>Показываются только выбранные вами данные.</p></div><CircleUserRound size={19}/></div>
       <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack profile-form">
         <FormField control={form.control} name="displayName" rules={{required:'Укажите отображаемое имя.'}} render={({field})=><FormItem><FormLabel>Отображаемое имя</FormLabel><FormControl><Input {...field} data-testid="input-profile-name"/></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="username" rules={{required:'Укажите имя пользователя.',pattern:{value:/^[a-z][a-z0-9_]{2,31}$/,message:'От 3 до 32 строчных латинских букв, цифр или знаков подчёркивания.'}}} render={({field})=><FormItem><FormLabel>Имя пользователя</FormLabel><FormControl><div className="input-prefix"><span>@</span><Input {...field} data-testid="input-profile-username"/></div></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="bio" render={({field})=><FormItem><FormLabel>О себе</FormLabel><FormControl><Textarea maxLength={280} placeholder="Пара слов о себе — если хотите." {...field} data-testid="input-profile-bio"/></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="avatarUrl" render={({field})=><FormItem><FormLabel>Ссылка на изображение профиля</FormLabel><FormControl><Input type="url" placeholder="https://…" {...field} data-testid="input-profile-avatar"/></FormControl><FormMessage/></FormItem>}/>
-        <div className="privacy-note"><Shield size={17}/><div><b>Приватность Mono</b><p>Личные переписки видны только их участникам. Публикации открытых каналов доступны всем. Управление приватностью аккаунта пока не подключено к настройкам профиля.</p></div></div>
+        <div className="privacy-note"><Shield size={17}/><div><b>Приватность MonoGram</b><p>Личные переписки видны только их участникам. Публикации открытых каналов доступны всем. Управление приватностью аккаунта пока не подключено к настройкам профиля.</p></div></div>
         {form.formState.errors.root&&<p className="form-error">{form.formState.errors.root.message}</p>}
         <div className="form-actions">{saved&&<span className="saved-note"><Check size={15}/> Изменения сохранены</span>}<Button className="primary-button" disabled={save.isPending} data-testid="button-save-profile">{save.isPending?'Сохраняем…':'Сохранить изменения'}</Button></div>
       </form></Form>
@@ -463,7 +451,7 @@ function StarsPage() {
   return <div className="page-content narrow-page"><PageHeader kicker="БЛАГОДАРНОСТЬ В ВАШИХ РУКАХ" title="Звёзды" description="Отправляйте звёзды авторам понравившихся записей."/>
     {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? <StateBlock title="Счёт недоступен" detail="Ваш баланс сохранён. Попробуйте чуть позже." action="Повторить" onAction={()=>query.refetch()}/> : <><section className="balance-card glass-card"><div className="balance-decoration"><Star size={32}/></div><div><span className="overline">ВАШ БАЛАНС</span><div className="balance-value">{wallet?.balance ?? 0}<span>звёзд</span></div><p>Благодарите авторов за публикации.</p></div><div className="balance-stamp"><Sparkles size={18}/><span>ВАЖНЫЕ<br/>ОТКЛИКИ</span></div></section>
       <section className="ledger-section"><div className="section-title"><div><span className="overline">НЕДАВНИЕ ОПЕРАЦИИ</span><h2>История звёзд</h2></div><span>{wallet?.transactions.length || 0} записей</span></div>
-        {!wallet?.transactions.length ? <div className="empty-panel ledger-empty"><div className="empty-mark"><Wallet size={20}/></div><h2>Операций пока нет</h2><p>Здесь будут отображаться ваши звёзды Mono.</p></div> : <div className="ledger-list glass-card">{wallet.transactions.map(tx=><div className="ledger-row" key={tx.id} data-testid={`transaction-${tx.id}`}><div className={`ledger-icon ${tx.amount < 0 ? 'spent' : ''}`}>{tx.amount < 0 ? <Send size={16}/> : <Star size={16}/>}</div><div className="ledger-copy"><b>{transactionLabel(tx.reason)}</b><span>{dateLabel(tx.createdAt)}</span></div><strong className={tx.amount < 0 ? 'amount-out' : 'amount-in'}>{tx.amount > 0 ? '+' : ''}{tx.amount}</strong></div>)}</div>}
+        {!wallet?.transactions.length ? <div className="empty-panel ledger-empty"><div className="empty-mark"><Wallet size={20}/></div><h2>Операций пока нет</h2><p>Здесь будут отображаться ваши звёзды MonoGram.</p></div> : <div className="ledger-list glass-card">{wallet.transactions.map(tx=><div className="ledger-row" key={tx.id} data-testid={`transaction-${tx.id}`}><div className={`ledger-icon ${tx.amount < 0 ? 'spent' : ''}`}>{tx.amount < 0 ? <Send size={16}/> : <Star size={16}/>}</div><div className="ledger-copy"><b>{transactionLabel(tx.reason)}</b><span>{dateLabel(tx.createdAt)}</span></div><strong className={tx.amount < 0 ? 'amount-out' : 'amount-in'}>{tx.amount > 0 ? '+' : ''}{tx.amount}</strong></div>)}</div>}
       </section></>}
   </div>;
 }
@@ -490,7 +478,7 @@ function ContactsPage() {
 
   return <div className="page-content mono-page">
     <PageHeader
-      kicker="ЛЮДИ MONO"
+      kicker="ЛЮДИ MONOGRAM"
       title="Контакты"
       description="Найдите человека по имени пользователя и начните переписку."
     />
@@ -562,7 +550,7 @@ function SettingsPage() {
       </Link>
       <Link className="mono-settings-row" href="/stars">
         <span className="mono-settings-icon"><Star size={19} /></span>
-        <span><b>Звёзды Mono</b><small>Баланс и история операций</small></span>
+        <span><b>Звёзды MonoGram</b><small>Баланс и история операций</small></span>
         <ArrowRight size={17} />
       </Link>
       <button className="mono-settings-row mono-settings-row--logout" onClick={() => { void logout(); }} type="button">
@@ -577,7 +565,7 @@ function SettingsPage() {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="boot-screen"><div className="boot-mark"><MessageCircle size={20}/></div><span>MONO</span><div className="boot-line"/></div>;
+  if (loading) return <div className="boot-screen"><div className="boot-mark"><MessageCircle size={20}/></div><span>MONOGRAM</span><div className="boot-line"/></div>;
   if (!user) return <AuthScreen/>;
   return <AppShell><ErrorBoundary resetKey={window.location.pathname}><Switch>
     <Route path="/" component={ChatWorkspace}/>
