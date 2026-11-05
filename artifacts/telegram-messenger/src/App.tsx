@@ -282,7 +282,7 @@ function Navigation({ profile, hidden = false, unreadChatsCount = 0 }: {
     { href: '/settings', label: 'Настройки', testId: 'settings', icon: Settings2 },
     { href: '/profile', label: 'Профиль', testId: 'my-profile', icon: UserRound },
   ];
-  return <nav className={`mono-tabbar ${hidden ? 'mono-tabbar--hidden' : ''}`} aria-label="Главная навигация">
+  return <nav className={`mono-tabbar glass-surface ${hidden ? 'mono-tabbar--hidden' : ''}`} aria-label="Главная навигация">
     {links.map(({ href, label, testId, icon: Icon }) => {
       const active = href === '/'
         ? path === '/' || path.startsWith('/chat/')
@@ -370,7 +370,7 @@ function ChatWorkspace() {
   const messages = messagesQuery.data || [];
   return <div className={`chat-layout ${id ? 'chat-open' : ''}`}>
     <aside className="chat-sidebar">
-      <header className="chat-sidebar-head">
+      <header className="chat-sidebar-head glass-surface">
         <h1>MonoGram</h1>
         <div className="chat-header-actions">
           <button
@@ -396,7 +396,7 @@ function ChatWorkspace() {
           </div>}
         </div>
       </header>
-      <div className="search-control chat-search">
+      <div className="search-control chat-search glass-surface">
         <Search size={17} aria-hidden="true" />
         <input aria-label="Поиск чатов" value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск чатов" data-testid="input-chat-search" />
         {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск"><X size={16} /></button>}
@@ -407,7 +407,7 @@ function ChatWorkspace() {
           const lastMessage = chat.lastMessage;
           const isOwnMessage = lastMessage?.authorId === user?.id;
           const isRead = lastMessage?.isRead === true || Boolean(lastMessage?.readAt);
-          return <button className={`conversation-row ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
+          return <button className={`conversation-row glass-surface ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
           <Avatar profile={chat.person} />
           <span className="conversation-row-copy">
             <span className="row-title"><span className="row-name">{chat.person.displayName}</span><time>{clock(lastMessage?.createdAt)}</time></span>
@@ -429,7 +429,7 @@ function ChatWorkspace() {
     </aside>
     <section className="chat-stage">
       {current ? <>
-         <header className="chat-topbar"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={presence.onlineUserIds.includes(current.person.id) ? 'presence-online' : ''}>{presence.onlineUserIds.includes(current.person.id) ? 'В сети' : `@${current.person.username}`}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>@{current.person.username}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
+         <header className="chat-topbar glass-surface"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={presence.onlineUserIds.includes(current.person.id) ? 'presence-online' : ''}>{presence.onlineUserIds.includes(current.person.id) ? 'В сети' : `@${current.person.username}`}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>@{current.person.username}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
          <div className="message-area">
           {messagesQuery.isLoading ? <div className="message-skeleton"><i/><i/><i/></div> : messagesQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Переписка сохранена. Попробуйте ещё раз." action="Повторить" onAction={() => messagesQuery.refetch()} /> : messages.length === 0 ? <div className="chat-welcome"><span className="welcome-symbol"><MessageCircle size={23}/></span><span className="overline">ЛИЧНАЯ ПЕРЕПИСКА</span><h2>Поздоровайтесь с {current.person.displayName.split(' ')[0]}.</h2><p>Эту переписку видите только вы и собеседник.</p></div> : <div className="message-thread">{messages.map((message: DirectMessage) => {
             const mine = message.authorId === user?.id;
@@ -456,7 +456,7 @@ function StateBlock({ title, detail, action, onAction }: { title: string; detail
 }
 
 function PageHeader({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: React.ReactNode }) {
-  return <header className="page-header"><div><span className="overline">{kicker}</span><h1>{title}</h1><p>{description}</p></div>{action}</header>;
+  return <header className="page-header glass-surface"><div><span className="overline">{kicker}</span><h1>{title}</h1><p>{description}</p></div>{action}</header>;
 }
 
 function ChannelsPage() {
@@ -685,7 +685,7 @@ function SettingsPage() {
       title="Настройки"
       description="Профиль, каналы и звёзды вашего аккаунта."
     />
-    <section className="mono-settings-list glass-card" aria-label="Разделы приложения">
+    <section className="mono-settings-list glass-card glass-surface" aria-label="Разделы приложения">
       <Link className="mono-settings-row" href="/profile">
         <span className="mono-settings-icon"><UserRound size={19} /></span>
         <span><b>Профиль</b><small>Имя, имя пользователя и описание</small></span>
