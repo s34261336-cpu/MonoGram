@@ -42,13 +42,13 @@ function splitDisplayName(displayName?: string) {
   return { firstName: parts.shift() || '', lastName: parts.join(' ') };
 }
 const avatarPalette = [
-  ['#f1767e', '#d64c61'],
-  ['#ffa35e', '#e17442'],
-  ['#b18af2', '#7956c8'],
-  ['#65c88f', '#2e9167'],
-  ['#61c8d0', '#27899e'],
-  ['#79a8f8', '#456fc3'],
-  ['#e782b5', '#bd4f87'],
+  ['#34b8ff', '#635bff'],
+  ['#8d68ff', '#d84fb5'],
+  ['#32d2ad', '#3389ed'],
+  ['#477dff', '#a34ff0'],
+  ['#18bdd4', '#5369f4'],
+  ['#75d65d', '#27a893'],
+  ['#6d8cff', '#37c6df'],
 ] as const;
 function avatarColorIndex(profile?: Pick<Profile, 'id' | 'displayName'>) {
   const seed = profile?.id || profile?.displayName || '?';
@@ -386,47 +386,49 @@ function ChatWorkspace() {
   const messages = messagesQuery.data || [];
   return <div className={`chat-layout ${id ? 'chat-open' : ''}`}>
     <aside className="chat-sidebar">
-      <header className="chat-sidebar-head">
-        <h1>Чаты</h1>
-        <div className="chat-header-actions">
-          <button
-            className="chat-menu-button"
-            type="button"
-            onClick={() => document.querySelector<HTMLInputElement>('[data-testid="input-chat-search"]')?.focus()}
-            aria-label="Поиск чатов"
-            title="Поиск чатов"
-            data-testid="button-chat-search"
-          >
-            <Search size={21}/>
-          </button>
-          <button
-            className="chat-menu-button"
-            type="button"
-            onClick={() => setShowChatMenu(value => !value)}
-            title="Меню чатов"
-            aria-label="Меню чатов"
-            aria-expanded={showChatMenu}
-            data-testid="button-chat-menu"
-          >
-            <MoreVertical size={22} />
-          </button>
-          {showChatMenu && <div className="chat-header-menu" role="menu">
-            <button role="menuitem" onClick={() => { setNewChat(true); setShowChatMenu(false); }}>
-              <PenLine size={16} /> Новая переписка
+      <div className="chat-sidebar-top">
+        <header className="chat-sidebar-head">
+          <h1>Чаты</h1>
+          <div className="chat-header-actions">
+            <button
+              className="chat-menu-button"
+              type="button"
+              onClick={() => document.querySelector<HTMLInputElement>('[data-testid="input-chat-search"]')?.focus()}
+              aria-label="Поиск чатов"
+              title="Поиск чатов"
+              data-testid="button-chat-search"
+            >
+              <Search size={21}/>
             </button>
-            <button role="menuitem" onClick={() => { setPath('/contacts'); setShowChatMenu(false); }}>
-              <CircleUserRound size={16} /> Контакты
+            <button
+              className="chat-menu-button"
+              type="button"
+              onClick={() => setShowChatMenu(value => !value)}
+              title="Меню чатов"
+              aria-label="Меню чатов"
+              aria-expanded={showChatMenu}
+              data-testid="button-chat-menu"
+            >
+              <MoreVertical size={22} />
             </button>
-            <button role="menuitem" onClick={() => { setPath('/settings'); setShowChatMenu(false); }}>
-              <Settings2 size={16} /> Настройки
-            </button>
-          </div>}
+            {showChatMenu && <div className="chat-header-menu" role="menu">
+              <button role="menuitem" onClick={() => { setNewChat(true); setShowChatMenu(false); }}>
+                <PenLine size={16} /> Новая переписка
+              </button>
+              <button role="menuitem" onClick={() => { setPath('/contacts'); setShowChatMenu(false); }}>
+                <CircleUserRound size={16} /> Контакты
+              </button>
+              <button role="menuitem" onClick={() => { setPath('/settings'); setShowChatMenu(false); }}>
+                <Settings2 size={16} /> Настройки
+              </button>
+            </div>}
+          </div>
+        </header>
+        <div className="search-control chat-search glass-surface">
+          <Search size={17} aria-hidden="true" />
+          <input aria-label="Поиск чатов" value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск чатов" data-testid="input-chat-search" />
+          {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск"><X size={16} /></button>}
         </div>
-      </header>
-      <div className="search-control chat-search glass-surface">
-        <Search size={17} aria-hidden="true" />
-        <input aria-label="Поиск чатов" value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск чатов" data-testid="input-chat-search" />
-        {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск"><X size={16} /></button>}
       </div>
       <div className="conversation-list">
         {chatsQuery.isLoading ? <div className="list-skeleton">{[1,2,3,4].map(i => <div className="skeleton-chat" key={i}><i/><span/><b/></div>)}</div> : chatsQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => chatsQuery.refetch()} /> : filtered.length === 0 ? <div className="sidebar-empty"><div className="empty-mark"><MessageCircle size={19}/></div><b>{search ? 'Ничего не найдено' : 'Пока здесь тихо'}</b><p>{search ? 'Попробуйте другое имя или никнейм.' : 'Найдите человека по имени пользователя, чтобы начать личную переписку.'}</p>{!search && <button className="text-action" onClick={() => setNewChat(true)} data-testid="button-start-first-chat">Найти человека <ArrowLeft size={14}/></button>}</div> : filtered.map((chat: Conversation) => {
