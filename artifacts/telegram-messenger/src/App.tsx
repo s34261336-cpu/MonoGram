@@ -676,6 +676,7 @@ function AccountEditPage() {
   const [lastName, setLastName] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState('');
+  const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -685,6 +686,15 @@ function AccountEditPage() {
     setBio(profile.bio);
     setError('');
   }, [profile?.id, profile?.displayName, profile?.bio]);
+
+  useEffect(() => {
+    const textarea = bioTextareaRef.current;
+    if (!textarea) return;
+    const maxHeight = 130;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [bio]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -738,40 +748,39 @@ function AccountEditPage() {
       {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? (
         <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={() => query.refetch()}/>
       ) : profile && <form id="tg-account-edit-form" className="tg-account-form" onSubmit={event => void submit(event)}>
-        <div className="tg-account-fields glass-card">
-          <div className="tg-account-field">
-            <label htmlFor="tg-account-first-name">Имя</label>
-            <Input
-              id="tg-account-first-name"
-              value={firstName}
-              onChange={event => setFirstName(event.target.value)}
-              maxLength={80}
-              data-testid="input-account-first-name"
-            />
-          </div>
-          <div className="tg-account-field">
-            <label htmlFor="tg-account-last-name">Фамилия</label>
-            <Input
-              id="tg-account-last-name"
-              value={lastName}
-              onChange={event => setLastName(event.target.value)}
-              maxLength={80}
-              data-testid="input-account-last-name"
-            />
-          </div>
-          <div className="tg-account-field tg-account-field--bio">
-            <label htmlFor="tg-account-bio">О себе</label>
-            <Textarea
-              id="tg-account-bio"
-              value={bio}
-              onChange={event => setBio(event.target.value.slice(0, 280))}
-              maxLength={280}
-              rows={5}
-              placeholder="Пара слов о себе — если хотите."
-              data-testid="input-account-bio"
-            />
-            <span className="tg-account-counter">{bio.length}/280</span>
-          </div>
+        <div className="tg-account-field glass-card">
+          <label htmlFor="tg-account-first-name">Имя</label>
+          <Input
+            id="tg-account-first-name"
+            value={firstName}
+            onChange={event => setFirstName(event.target.value)}
+            maxLength={80}
+            data-testid="input-account-first-name"
+          />
+        </div>
+        <div className="tg-account-field glass-card">
+          <label htmlFor="tg-account-last-name">Фамилия</label>
+          <Input
+            id="tg-account-last-name"
+            value={lastName}
+            onChange={event => setLastName(event.target.value)}
+            maxLength={80}
+            data-testid="input-account-last-name"
+          />
+        </div>
+        <div className="tg-account-field tg-account-field--bio glass-card">
+          <label htmlFor="tg-account-bio">О себе</label>
+          <Textarea
+            ref={bioTextareaRef}
+            id="tg-account-bio"
+            value={bio}
+            onChange={event => setBio(event.target.value.slice(0, 280))}
+            maxLength={280}
+            rows={1}
+            placeholder="Пара слов о себе — если хотите."
+            data-testid="input-account-bio"
+          />
+          <span className="tg-account-counter">{bio.length}/280</span>
         </div>
         {error && <p className="form-error tg-account-error" role="alert">{error}</p>}
       </form>}
