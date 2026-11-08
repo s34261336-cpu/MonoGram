@@ -5,6 +5,8 @@ export const modules: ModuleMap = {
   "./components/mockups/monogram-auth/Glass.tsx": () => import("../components/mockups/monogram-auth/Glass.tsx"),
   "./components/mockups/monogram-chat-list/Colorful.tsx": () => import("../components/mockups/monogram-chat-list/Colorful.tsx"),
   "./components/mockups/monogram-chat-list/Current.tsx": () => import("../components/mockups/monogram-chat-list/Current.tsx"),
+  "./components/mockups/monogram-light-refresh/Current.tsx": () => import("../components/mockups/monogram-light-refresh/Current.tsx"),
+  "./components/mockups/monogram-light-refresh/Light.tsx": () => import("../components/mockups/monogram-light-refresh/Light.tsx"),
   "./components/mockups/monogram-tabs/Current.tsx": () => import("../components/mockups/monogram-tabs/Current.tsx"),
   "./components/mockups/monogram-tabs/GlassBottomNav.tsx": () => import("../components/mockups/monogram-tabs/GlassBottomNav.tsx")
 };

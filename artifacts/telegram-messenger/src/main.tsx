@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
 import './telegram-glass.css';
+import './light-restyle.css';
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
