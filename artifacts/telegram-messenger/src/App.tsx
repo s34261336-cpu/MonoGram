@@ -690,9 +690,10 @@ function AccountEditPage() {
   useEffect(() => {
     const textarea = bioTextareaRef.current;
     if (!textarea) return;
+    const minHeight = 78;
     const maxHeight = 130;
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)}px`;
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [bio]);
 
@@ -748,40 +749,47 @@ function AccountEditPage() {
       {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? (
         <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={() => query.refetch()}/>
       ) : profile && <form id="tg-account-edit-form" className="tg-account-form" onSubmit={event => void submit(event)}>
-        <div className="tg-account-field glass-card">
-          <label htmlFor="tg-account-first-name">Имя</label>
-          <Input
-            id="tg-account-first-name"
-            value={firstName}
-            onChange={event => setFirstName(event.target.value)}
-            maxLength={80}
-            data-testid="input-account-first-name"
-          />
-        </div>
-        <div className="tg-account-field glass-card">
-          <label htmlFor="tg-account-last-name">Фамилия</label>
-          <Input
-            id="tg-account-last-name"
-            value={lastName}
-            onChange={event => setLastName(event.target.value)}
-            maxLength={80}
-            data-testid="input-account-last-name"
-          />
-        </div>
-        <div className="tg-account-field tg-account-field--bio glass-card">
-          <label htmlFor="tg-account-bio">О себе</label>
-          <Textarea
-            ref={bioTextareaRef}
-            id="tg-account-bio"
-            value={bio}
-            onChange={event => setBio(event.target.value.slice(0, 280))}
-            maxLength={280}
-            rows={1}
-            placeholder="Пара слов о себе — если хотите."
-            data-testid="input-account-bio"
-          />
-          <span className="tg-account-counter">{bio.length}/280</span>
-        </div>
+        <section className="tg-account-group" aria-labelledby="tg-account-name-label">
+          <h2 className="tg-account-section-label" id="tg-account-name-label">Ваше имя</h2>
+          <div className="tg-account-name-card">
+            <Input
+              id="tg-account-first-name"
+              aria-label="Имя"
+              placeholder="Имя"
+              value={firstName}
+              onChange={event => setFirstName(event.target.value)}
+              maxLength={80}
+              data-testid="input-account-first-name"
+            />
+            <div className="tg-account-divider" aria-hidden="true"/>
+            <Input
+              id="tg-account-last-name"
+              aria-label="Фамилия"
+              placeholder="Фамилия"
+              value={lastName}
+              onChange={event => setLastName(event.target.value)}
+              maxLength={80}
+              data-testid="input-account-last-name"
+            />
+          </div>
+        </section>
+        <section className="tg-account-group" aria-labelledby="tg-account-bio-label">
+          <h2 className="tg-account-section-label" id="tg-account-bio-label">О себе</h2>
+          <div className="tg-account-bio-card">
+            <Textarea
+              ref={bioTextareaRef}
+              id="tg-account-bio"
+              aria-label="О себе"
+              value={bio}
+              onChange={event => setBio(event.target.value.slice(0, 280))}
+              maxLength={280}
+              rows={3}
+              placeholder="Пара слов о себе — если хотите."
+              data-testid="input-account-bio"
+            />
+            <span className="tg-account-counter">{bio.length}/280</span>
+          </div>
+        </section>
         {error && <p className="form-error tg-account-error" role="alert">{error}</p>}
       </form>}
     </div>
