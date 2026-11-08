@@ -1,5 +1,5 @@
 - [Replit GitHub proxy](replit-github-proxy.md) — `github.replit.internal` may be the normal proxied remote for a GitHub repo.
 - [Русский интерфейс](russian-ui.md) — бренд MonoGram; весь пользовательский интерфейс на русском.
-- [Стиль Telegram со стеклом](telegram-glass.md) — тёмный стеклянный интерфейс Mono следует Telegram-референсу; навигация снизу.
+- [Плоский стиль Telegram](telegram-glass.md) — тёмный плоский интерфейс без стекла и размытия; нижняя капсула навигации сохраняется.
 - [Демо-код входа](demo-code-auth.md) — сохранять вход по коду на экране, не добавляя SMS или отдельную службу отправки без запроса.
 - [Ограничения Git в Replit](git-write-guard.md) — для разрешённых пользователем операций записи в Git может потребоваться `DANGEROUSLY_ALLOW_GIT=1`.

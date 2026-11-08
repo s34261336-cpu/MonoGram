@@ -387,10 +387,21 @@ function ChatWorkspace() {
   return <div className={`chat-layout ${id ? 'chat-open' : ''}`}>
     <aside className="chat-sidebar">
       <header className="chat-sidebar-head">
-        <h1>MonoGram</h1>
+        <h1>Чаты</h1>
         <div className="chat-header-actions">
           <button
             className="chat-menu-button"
+            type="button"
+            onClick={() => document.querySelector<HTMLInputElement>('[data-testid="input-chat-search"]')?.focus()}
+            aria-label="Поиск чатов"
+            title="Поиск чатов"
+            data-testid="button-chat-search"
+          >
+            <Search size={21}/>
+          </button>
+          <button
+            className="chat-menu-button"
+            type="button"
             onClick={() => setShowChatMenu(value => !value)}
             title="Меню чатов"
             aria-label="Меню чатов"
@@ -541,6 +552,7 @@ function ProfilePage() {
   const [saved,setSaved] = useState(false);
   const [editing,setEditing] = useState(false);
   const [bioMenuOpen,setBioMenuOpen] = useState(false);
+  const [profileMenuOpen,setProfileMenuOpen] = useState(false);
   const [bioNotice,setBioNotice] = useState('');
   const bioMenuRef = useRef<HTMLDivElement>(null);
   const form = useForm<{username:string;avatarUrl:string}>({defaultValues:{username:'',avatarUrl:''}});
@@ -597,6 +609,22 @@ function ProfilePage() {
   }
   return <div className="page-content tg-profile-page">
     {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={()=>query.refetch()}/> : <main className="tg-profile">
+      <header className="mono-screen-header tg-profile-toolbar">
+        <span className="mono-screen-header-spacer" aria-hidden="true"/>
+        <h2>Профиль</h2>
+        <div className="mono-screen-header-actions">
+          <button type="button" aria-label="Поиск контактов" title="Поиск контактов" onClick={() => setPath('/contacts')} data-testid="button-profile-search">
+            <Search size={21}/>
+          </button>
+          <button type="button" aria-label="Дополнительные действия" title="Дополнительные действия" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen(value => !value)} data-testid="button-profile-menu">
+            <MoreVertical size={21}/>
+          </button>
+          {profileMenuOpen && <div className="mono-screen-menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); setPath('/profile/edit'); }}>Изменить аккаунт</button>
+            <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); setPath('/settings'); }}>Настройки</button>
+          </div>}
+        </div>
+      </header>
       <header className="tg-profile-header">
         <div className="tg-profile-avatar-wrap">
           <Avatar profile={profile} size="lg"/>
@@ -605,7 +633,7 @@ function ProfilePage() {
           </button>
         </div>
         <h1>{profile?.displayName || 'Пользователь'}</h1>
-        <span className="tg-profile-status"><i/>в сети</span>
+        <span className="tg-profile-status">{formatPhone(user?.phone)} · @{profile?.username || 'username'}</span>
       </header>
 
       <div className="tg-profile-actions" aria-label="Действия профиля">
@@ -872,7 +900,17 @@ function ContactsPage() {
 
 function SettingsPage() {
   const { signOut } = useAuth();
+  const [, setPath] = useLocation();
   const [error, setError] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const matches = (value: string) => !normalizedSearch || value.toLowerCase().includes(normalizedSearch);
+  const hasVisibleRows = matches('Профиль Имя имя пользователя описание') ||
+    matches('Каналы Публикации и подписки') ||
+    matches('Звёзды MonoGram Баланс и история операций') ||
+    matches('Выйти из аккаунта Завершить текущий сеанс');
 
   async function logout() {
     setError('');
@@ -884,32 +922,49 @@ function SettingsPage() {
   }
 
   return <div className="page-content mono-page">
-    <PageHeader
-      kicker="УПРАВЛЕНИЕ АККАУНТОМ"
-      title="Настройки"
-      description="Профиль, каналы и звёзды вашего аккаунта."
-    />
-    <section className="mono-settings-list glass-card glass-surface" aria-label="Разделы приложения">
-      <Link className="mono-settings-row" href="/profile">
+    <header className="mono-screen-header">
+      <span className="mono-screen-header-spacer" aria-hidden="true"/>
+      <h1>Настройки</h1>
+      <div className="mono-screen-header-actions">
+        <button type="button" aria-label="Поиск настроек" title="Поиск настроек" aria-expanded={searchOpen} onClick={() => { setSearchOpen(value => !value); setMenuOpen(false); if (searchOpen) setSearchTerm(''); }} data-testid="button-settings-search">
+          <Search size={21}/>
+        </button>
+        <button type="button" aria-label="Дополнительные действия" title="Дополнительные действия" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value); setSearchOpen(false); }} data-testid="button-settings-menu">
+          <MoreVertical size={21}/>
+        </button>
+        {menuOpen && <div className="mono-screen-menu" role="menu">
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setPath('/profile'); }}>Профиль</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void logout(); }}>Выйти из аккаунта</button>
+        </div>}
+      </div>
+    </header>
+    {searchOpen && <label className="mono-settings-search">
+      <Search size={17} aria-hidden="true"/>
+      <input aria-label="Поиск по настройкам" placeholder="Поиск настроек" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} autoComplete="off"/>
+      {searchTerm && <button type="button" aria-label="Очистить поиск" onClick={() => setSearchTerm('')}><X size={16}/></button>}
+    </label>}
+    <section className="mono-settings-list" aria-label="Разделы приложения">
+      {matches('Профиль Имя имя пользователя описание') && <Link className="mono-settings-row" href="/profile">
         <span className="mono-settings-icon"><UserRound size={19} /></span>
         <span><b>Профиль</b><small>Имя, имя пользователя и описание</small></span>
         <ArrowRight size={17} />
-      </Link>
-      <Link className="mono-settings-row" href="/channels">
+      </Link>}
+      {matches('Каналы Публикации и подписки') && <Link className="mono-settings-row" href="/channels">
         <span className="mono-settings-icon"><Compass size={19} /></span>
         <span><b>Каналы</b><small>Публикации и подписки</small></span>
         <ArrowRight size={17} />
-      </Link>
-      <Link className="mono-settings-row" href="/stars">
+      </Link>}
+      {matches('Звёзды MonoGram Баланс и история операций') && <Link className="mono-settings-row" href="/stars">
         <span className="mono-settings-icon"><Star size={19} /></span>
         <span><b>Звёзды MonoGram</b><small>Баланс и история операций</small></span>
         <ArrowRight size={17} />
-      </Link>
-      <button className="mono-settings-row mono-settings-row--logout" onClick={() => { void logout(); }} type="button">
+      </Link>}
+      {matches('Выйти из аккаунта Завершить текущий сеанс') && <button className="mono-settings-row mono-settings-row--logout" onClick={() => { void logout(); }} type="button">
         <span className="mono-settings-icon"><LogOut size={19} /></span>
         <span><b>Выйти из аккаунта</b><small>Завершить текущий сеанс</small></span>
         <ArrowRight size={17} />
-      </button>
+      </button>}
+      {!hasVisibleRows && <p className="mono-settings-empty">Ничего не найдено</p>}
     </section>
     {error && <p className="mono-contact-error" role="alert">{error}</p>}
   </div>;
