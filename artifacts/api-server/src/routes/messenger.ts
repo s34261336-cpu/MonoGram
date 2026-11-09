@@ -1,6 +1,9 @@
 import { Router, type IRouter, type Request, type Response, type RequestHandler } from 'express';
+import { Readable } from 'node:stream';
+import { RequestMessengerUploadUrlBody, RequestMessengerUploadUrlResponse } from '@workspace/api-zod';
 import { requireDemoSession } from '../lib/demo-session';
 import { supabaseAdmin } from '../lib/supabase-admin';
+import { ObjectNotFoundError, ObjectStorageService } from '../lib/objectStorage';
 
 type ProfileRow = {
   id: string;
@@ -12,6 +15,10 @@ type ProfileRow = {
 
 const router: IRouter = Router();
 const profileFields = 'id, username, display_name, bio, avatar_url';
+const imageMessagePrefix = 'MONOGRAM_IMAGE_V1:';
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const maxImageBytes = 10 * 1024 * 1024;
+const objectStorageService = new ObjectStorageService();
 
 function apiError(message: string, status = 400) {
   return Object.assign(new Error(message), { status });
@@ -29,6 +36,23 @@ function toProfile(row: ProfileRow) {
     bio: row.bio ?? '',
     avatarUrl: row.avatar_url,
   };
+}
+
+function decodeMessageContent(value: string) {
+  if (!value.startsWith(imageMessagePrefix)) return { content: value, imagePath: null as string | null };
+  try {
+    const payload = JSON.parse(value.slice(imageMessagePrefix.length)) as { path?: unknown; caption?: unknown };
+    if (typeof payload.path === 'string' && typeof payload.caption === 'string') {
+      return { content: payload.caption, imagePath: payload.path };
+    }
+  } catch {
+    // Keep legacy or malformed content visible as ordinary text.
+  }
+  return { content: value, imagePath: null as string | null };
+}
+
+function imageUrlFor(messageId: string, imagePath: string | null) {
+  return imagePath ? `/api/messenger/messages/${encodeURIComponent(messageId)}/image` : null;
 }
 
 function handleRoute(fn: (req: Request, res: Response) => Promise<void>): RequestHandler {
@@ -66,6 +90,15 @@ async function isChannelMember(channelId: string, id: string) {
 
 router.use(requireDemoSession);
 
+router.post('/uploads/request-url', handleRoute(async (req, res) => {
+  const parsed = RequestMessengerUploadUrlBody.safeParse(req.body);
+  if (!parsed.success) throw apiError('Выберите фото JPG, PNG или WebP размером до 10 МБ.');
+  const ownerId = userId(req);
+  const uploadURL = await objectStorageService.getObjectEntityUploadURL(ownerId);
+  const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+  res.json(RequestMessengerUploadUrlResponse.parse({ uploadURL, objectPath }));
+}));
+
 router.get('/profile', handleRoute(async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('profiles')
@@ -92,6 +125,7 @@ router.patch('/profile', handleRoute(async (req, res) => {
     .eq('id', id)
     .select(profileFields)
     .single();
+  if (error?.code === '23505') throw apiError('Это имя пользователя уже занято.', 409);
   checkError(error);
   res.json(toProfile(data as ProfileRow));
 }));
@@ -183,13 +217,15 @@ router.get('/chats', handleRoute(async (req, res) => {
   for (const row of messagesResult.data ?? []) {
     if (latestByConversation.has(row.conversation_id)) continue;
     const author = row.author_id === id ? null : profiles.get(row.author_id);
+    const decoded = decodeMessageContent(row.content);
     latestByConversation.set(row.conversation_id, {
       id: row.id,
       conversationId: row.conversation_id,
       authorId: row.author_id,
       authorName: author?.displayName ?? (row.author_id === id ? 'Вы' : 'Пользователь'),
       authorUsername: author?.username ?? '',
-      content: row.content,
+      content: decoded.content,
+      imageUrl: imageUrlFor(row.id, decoded.imagePath),
       createdAt: row.created_at,
     });
   }
@@ -222,26 +258,87 @@ router.get('/messages', handleRoute(async (req, res) => {
   const profileById = new Map((profiles ?? []).map(row => [row.id, toProfile(row as ProfileRow)]));
   res.json(messages.map(row => {
     const author = profileById.get(row.author_id);
+    const decoded = decodeMessageContent(row.content);
     return {
       id: row.id,
       conversationId: row.conversation_id,
       authorId: row.author_id,
       authorName: author?.displayName ?? 'Пользователь',
       authorUsername: author?.username ?? '',
-      content: row.content,
+      content: decoded.content,
+      imageUrl: imageUrlFor(row.id, decoded.imagePath),
       createdAt: row.created_at,
     };
   }));
+}));
+
+router.get('/messages/:messageId/image', handleRoute(async (req, res) => {
+  const id = userId(req);
+  const { data, error } = await supabaseAdmin.from('dm_messages')
+    .select('id, conversation_id, content')
+    .eq('id', req.params.messageId)
+    .maybeSingle();
+  checkError(error);
+  if (!data || !(await isMember(data.conversation_id, id))) throw apiError('Фото не найдено.', 404);
+
+  const { imagePath } = decodeMessageContent(data.content);
+  if (!imagePath || !imagePath.startsWith('/objects/uploads/')) throw apiError('Фото не найдено.', 404);
+  let objectFile;
+  try {
+    objectFile = await objectStorageService.getObjectEntityFile(imagePath);
+  } catch (error) {
+    if (error instanceof ObjectNotFoundError) throw apiError('Фото не найдено.', 404);
+    throw error;
+  }
+  const [metadata] = await objectFile.getMetadata();
+  const contentType = typeof metadata.contentType === 'string' ? metadata.contentType : '';
+  if (!allowedImageTypes.has(contentType) || Number(metadata.size) > maxImageBytes) {
+    throw apiError('Фото не найдено.', 404);
+  }
+
+  const response = await objectStorageService.downloadObject(objectFile, 3600);
+  res.status(response.status);
+  response.headers.forEach((value, key) => res.setHeader(key, value));
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (response.body) {
+    Readable.fromWeb(response.body as ReadableStream<Uint8Array>).pipe(res);
+  } else {
+    res.end();
+  }
 }));
 
 router.post('/messages', handleRoute(async (req, res) => {
   const id = userId(req);
   const conversationId = typeof req.body?.conversationId === 'string' ? req.body.conversationId : '';
   const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
-  if (!content || content.length > 4000) throw apiError('Сообщение должно содержать от 1 до 4000 символов.');
+  const imagePath = typeof req.body?.imagePath === 'string' ? req.body.imagePath : '';
+  if (!content && !imagePath) throw apiError('Добавьте текст или фото к сообщению.');
+  if (content.length > 4000) throw apiError('Сообщение не должно превышать 4000 символов.');
   if (!(await isMember(conversationId, id))) throw apiError('Переписка не найдена.', 404);
+  let storedContent = content;
+  if (imagePath) {
+    const ownerPrefix = `/objects/uploads/${id}/`;
+    const objectId = imagePath.startsWith(ownerPrefix) ? imagePath.slice(ownerPrefix.length) : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectId)) {
+      throw apiError('Фото не найдено.', 400);
+    }
+    let imageFile;
+    try {
+      imageFile = await objectStorageService.getObjectEntityFile(imagePath);
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) throw apiError('Фото не найдено.', 400);
+      throw error;
+    }
+    const [metadata] = await imageFile.getMetadata();
+    const imageType = typeof metadata.contentType === 'string' ? metadata.contentType : '';
+    if (!allowedImageTypes.has(imageType) || Number(metadata.size) > maxImageBytes) {
+      throw apiError('Фото должно быть JPG, PNG или WebP размером до 10 МБ.', 400);
+    }
+    storedContent = `${imageMessagePrefix}${JSON.stringify({ path: imagePath, caption: content })}`;
+    if (storedContent.length > 4000) throw apiError('Подпись к фото слишком длинная.', 400);
+  }
   const { data, error } = await supabaseAdmin.from('dm_messages')
-    .insert({ conversation_id: conversationId, author_id: id, content })
+    .insert({ conversation_id: conversationId, author_id: id, content: storedContent })
     .select('id, conversation_id, author_id, content, created_at')
     .single();
   checkError(error);
@@ -256,7 +353,8 @@ router.post('/messages', handleRoute(async (req, res) => {
     authorId: data.author_id,
     authorName: profile.display_name,
     authorUsername: profile.username,
-    content: data.content,
+    content,
+    imageUrl: imageUrlFor(data.id, imagePath || null),
     createdAt: data.created_at,
   });
 }));

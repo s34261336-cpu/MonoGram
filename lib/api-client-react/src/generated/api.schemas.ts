@@ -76,3 +76,32 @@ export interface MessageInput {
   fileName?: string;
 }
 
+export type RequestUploadUrlBodyContentType = typeof RequestUploadUrlBodyContentType[keyof typeof RequestUploadUrlBodyContentType];
+
+
+export const RequestUploadUrlBodyContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface RequestUploadUrlBody {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 10485760
+     */
+  size: number;
+  contentType: RequestUploadUrlBodyContentType;
+}
+
+export interface RequestUploadUrlResponse {
+  uploadURL: string;
+  /** @pattern ^/objects/uploads/[0-9a-f-]+/[0-9a-f-]+$ */
+  objectPath: string;
+}
+

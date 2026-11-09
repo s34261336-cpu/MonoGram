@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, usePosts, useProfile, useSaveProfile, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
 import { usePresence } from '@/hooks/use-presence';
 import { useChatReadState } from '@/hooks/use-chat-read-state';
-import type { Channel, ChannelPost, Conversation, DirectMessage, Profile } from '@/lib/messenger';
+import { uploadMessagePhoto, type Channel, type ChannelPost, type Conversation, type DirectMessage, type Profile } from '@/lib/messenger';
+import { apiBlobRequest } from '@/lib/api';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +17,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, ArrowRight, AtSign, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Copy, Crown, Hash, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Copy, Crown, Hash, ImagePlus, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
@@ -87,8 +88,9 @@ function userError(error: unknown, fallback: string, authMode?: 'request-code') 
   if (/failed to fetch|network|fetch error|load failed/.test(normalized) || status === 0 || (status >= 502 && status <= 504)) return 'Не удалось подключиться. Проверьте интернет и попробуйте снова.';
   if (status === 404 && authMode === 'request-code') return 'Сервис выдачи демо-кода не найден. Обновите страницу и попробуйте снова.';
   if (status === 401) return 'Сессия завершена. Войдите снова.';
-  if (status === 404 || status === 409) return fallback;
+  if (status === 404) return fallback;
   if (/[А-Яа-яЁё]/.test(message)) return message;
+  if (status === 409) return fallback;
   return fallback;
 }
 
@@ -112,6 +114,33 @@ function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'id' | 'disp
   >
     {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : initials(profile?.displayName)}
   </div>;
+}
+
+function MessageImage({ src }: { src: string }) {
+  const [objectUrl, setObjectUrl] = useState('');
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let localUrl = '';
+    setObjectUrl('');
+    setFailed(false);
+    apiBlobRequest(src, controller.signal).then(blob => {
+      if (controller.signal.aborted) return;
+      localUrl = URL.createObjectURL(blob);
+      setObjectUrl(localUrl);
+    }).catch(() => {
+      if (!controller.signal.aborted) setFailed(true);
+    });
+    return () => {
+      controller.abort();
+      if (localUrl) URL.revokeObjectURL(localUrl);
+    };
+  }, [src]);
+
+  if (failed) return <span className="message-image-error">Не удалось загрузить фото</span>;
+  if (!objectUrl) return <span className="message-image-loading" aria-label="Загрузка фото" />;
+  return <img className="message-image" src={objectUrl} alt="Фото в сообщении" loading="lazy" />;
 }
 
 function AuthScreen() {
@@ -358,14 +387,21 @@ function ChatWorkspace() {
   const sendMessage = useSendMessage(user?.id || '');
   const startConversation = useStartConversation(user?.id || '');
   const [draft, setDraft] = useState('');
+  const [pendingImage, setPendingImage] = useState<{ file: File; preview: string; uploadedPath?: string } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState('');
   const setUnreadChatsCount = useContext(UnreadChatsCountContext);
   const { markRead, unreadCountFor } = useChatReadState(user?.id || '');
   const endRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const searchUsers = useUserSearch(username.replace(/^@/, ''), user?.id || '');
-  const filtered = useMemo(() => chats.filter(c => `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`.toLowerCase().includes(search.toLowerCase())), [chats, search]);
+  const filtered = useMemo(() => chats.filter(c => `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru'))), [chats, search]);
   const unreadChatsCount = chats.filter(chat => unreadCountFor(chat) > 0).length;
-  useEffect(() => { setDraft(''); setError(''); }, [id]);
+  useEffect(() => { setDraft(''); setError(''); setPendingImage(null); }, [id]);
+  useEffect(() => {
+    const preview = pendingImage?.preview;
+    return () => { if (preview) URL.revokeObjectURL(preview); };
+  }, [pendingImage?.preview]);
   useEffect(() => { if (messagesQuery.data?.length) endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messagesQuery.data?.length, id]);
   useEffect(() => { setUnreadChatsCount(unreadChatsCount); }, [setUnreadChatsCount, unreadChatsCount]);
   useEffect(() => {
@@ -373,10 +409,46 @@ function ChatWorkspace() {
   }, [id, current?.lastMessage?.id, markRead]);
   async function send(e?: FormEvent) {
     e?.preventDefault();
-    if (!user || !id || !draft.trim() || sendMessage.isPending) return;
+    if (!user || !id || (!draft.trim() && !pendingImage) || sendMessage.isPending || uploadingImage) return;
     setError('');
-    try { await sendMessage.mutateAsync({ conversationId: id, authorId: user.id, content: draft.trim() }); setDraft(''); }
+    try {
+      let imagePath: string | undefined;
+      if (pendingImage) {
+        imagePath = pendingImage.uploadedPath;
+        if (!imagePath) {
+          setUploadingImage(true);
+          imagePath = await uploadMessagePhoto(pendingImage.file);
+          const uploadedPath = imagePath;
+          setPendingImage(current => current?.file === pendingImage.file ? { ...current, uploadedPath } : current);
+        }
+      }
+      await sendMessage.mutateAsync({
+        conversationId: id,
+        authorId: user.id,
+        content: draft.trim(),
+        imagePath,
+      });
+      setDraft('');
+      setPendingImage(null);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
     catch (e) { setError(userError(e, 'Не удалось отправить сообщение.')); }
+    finally { setUploadingImage(false); }
+  }
+  function selectImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Выберите фото JPG, PNG или WebP.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Фото должно быть меньше 10 МБ.');
+      return;
+    }
+    setError('');
+    setPendingImage({ file, preview: URL.createObjectURL(file) });
   }
   async function beginChat(value = username) {
     setStartError('');
@@ -445,7 +517,7 @@ function ChatWorkspace() {
                 {isOwnMessage && (isRead
                   ? <CheckCheck size={16} className="row-read-check" aria-label="Прочитано" />
                   : <Check size={14} className="row-sent-check" aria-label="Отправлено" />)}
-                <span className="row-preview-text">{lastMessage ? `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.content}` : 'Сообщений пока нет'}</span>
+                <span className="row-preview-text">{lastMessage ? `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.content || (lastMessage.imageUrl ? 'Фото' : '')}` : 'Сообщений пока нет'}</span>
               </span>
               {unreadCount > 0 && <span className="conversation-unread" aria-label={`${unreadCount} непрочитанных`}>
                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -462,10 +534,19 @@ function ChatWorkspace() {
          <div className="message-area">
           {messagesQuery.isLoading ? <div className="message-skeleton"><i/><i/><i/></div> : messagesQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Переписка сохранена. Попробуйте ещё раз." action="Повторить" onAction={() => messagesQuery.refetch()} /> : messages.length === 0 ? <div className="chat-welcome"><span className="welcome-symbol"><MessageCircle size={23}/></span><span className="overline">ЛИЧНАЯ ПЕРЕПИСКА</span><h2>Поздоровайтесь с {current.person.displayName.split(' ')[0]}.</h2><p>Эту переписку видите только вы и собеседник.</p></div> : <div className="message-thread">{messages.map((message: DirectMessage) => {
             const mine = message.authorId === user?.id;
-            return <div className={`message-row ${mine ? 'mine' : ''}`} key={message.id} data-testid={`message-${message.id}`}><div className="message-bubble"><p>{message.content}</p><time>{clock(message.createdAt)} {mine && <Check size={12}/>}</time></div></div>;
+             return <div className={`message-row ${mine ? 'mine' : ''}`} key={message.id} data-testid={`message-${message.id}`}><div className="message-bubble">{message.imageUrl && <MessageImage src={message.imageUrl} />}{message.content && <p>{message.content}</p>}<time>{clock(message.createdAt)} {mine && <Check size={12}/>}</time></div></div>;
           })}<div ref={endRef}/></div>}
         </div>
-        <form className="composer" onSubmit={send}><textarea aria-label="Текст сообщения" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder="Напишите сообщение…" maxLength={4000} rows={1} data-testid="input-message" /><span className="composer-count">{draft.length ? `${draft.length}/4000` : 'Ввод — отправить'}</span><button className="send-circle" type="submit" disabled={!draft.trim() || sendMessage.isPending} aria-label="Отправить сообщение" data-testid="button-send-message">{sendMessage.isPending ? <LoaderCircle className="spin" size={17}/> : <Send size={17}/>}</button></form>
+         <form className={`composer ${pendingImage ? 'composer--with-image' : ''}`} onSubmit={send}>
+           {pendingImage && <div className="composer-image-preview"><img src={pendingImage.preview} alt="Фото для отправки"/><span>{pendingImage.file.name}</span><button type="button" aria-label="Убрать фото" onClick={() => setPendingImage(null)} data-testid="button-remove-chat-image"><X size={16}/></button></div>}
+           <div className="composer-main">
+             <input ref={imageInputRef} className="composer-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectImage} aria-label="Выбрать фото"/>
+             <button className="composer-attach" type="button" aria-label="Прикрепить фото" title="Прикрепить фото" onClick={() => imageInputRef.current?.click()} disabled={sendMessage.isPending || uploadingImage} data-testid="button-attach-photo"><ImagePlus size={21}/></button>
+             <textarea aria-label="Текст сообщения" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder={pendingImage ? 'Подпись к фото…' : 'Напишите сообщение…'} maxLength={4000} rows={1} data-testid="input-message" />
+             <span className="composer-count">{draft.length ? `${draft.length}/4000` : 'Ввод — отправить'}</span>
+             <button className="send-circle" type="submit" disabled={(!draft.trim() && !pendingImage) || sendMessage.isPending || uploadingImage} aria-label="Отправить сообщение" data-testid="button-send-message">{sendMessage.isPending || uploadingImage ? <LoaderCircle className="spin" size={17}/> : <Send size={17}/>}</button>
+           </div>
+         </form>
         {error && <div className="inline-error" role="alert">{error}<button onClick={() => void send()} data-testid="button-retry-message">Попробовать снова</button></div>}
       </> : <div className="conversation-empty"><div className="empty-art"><div className="art-ring ring-a"/><div className="art-ring ring-b"/><span><MessageCircle size={28}/></span></div><span className="overline">MONOGRAM / ЛИЧНЫЕ СООБЩЕНИЯ</span><h2>Место для важных разговоров.</h2><p>Выберите переписку или найдите человека по имени пользователя.</p><button className="primary-button" onClick={() => setNewChat(true)} data-testid="button-find-person"><Plus size={16}/> Найти человека</button><div className="empty-caption">Здесь нет примеров переписок. Начните с первого сообщения.</div></div>}
     </section>
@@ -497,7 +578,7 @@ function ChannelsPage() {
   const [filter, setFilter] = useState('');
   const form = useForm<{title:string;username:string;description:string}>({ defaultValues: { title:'', username:'', description:'' } });
   const channels = query.data || [];
-  const shown = channels.filter(c => `${c.title} ${c.username} ${c.description}`.toLowerCase().includes(filter.toLowerCase()));
+  const shown = channels.filter(c => `${c.title} ${c.username} ${c.description}`.toLocaleLowerCase('ru').includes(filter.trim().toLocaleLowerCase('ru')));
   async function submit(value: {title:string;username:string;description:string}) {
     try { const id = await create.mutateAsync({ title: value.title, username: value.username, description: value.description }); form.reset(); setModal(false); setPath(`/channels/${id}`); }
     catch (e) { form.setError('root', { message: userError(e, 'Не удалось создать канал.') }); }
@@ -704,6 +785,7 @@ function AccountEditPage() {
   const profile = query.data;
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState('');
   const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -713,9 +795,10 @@ function AccountEditPage() {
     const name = splitDisplayName(profile.displayName);
     setFirstName(name.firstName);
     setLastName(name.lastName);
+    setUsername(profile.username);
     setBio(profile.bio);
     setError('');
-  }, [profile?.id, profile?.displayName, profile?.bio]);
+  }, [profile?.id, profile?.displayName, profile?.username, profile?.bio]);
 
   useEffect(() => {
     const textarea = bioTextareaRef.current;
@@ -740,13 +823,18 @@ function AccountEditPage() {
       setError('Имя и фамилия вместе должны содержать не более 80 символов.');
       return;
     }
+    const normalizedUsername = username.trim().replace(/^@/, '').toLowerCase();
+    if (!/^[a-z][a-z0-9_]{2,31}$/.test(normalizedUsername)) {
+      setError('Имя пользователя: от 3 до 32 латинских букв, цифр или знаков подчёркивания.');
+      return;
+    }
 
     setError('');
     try {
       await save.mutateAsync({
         id: user.id,
         displayName,
-        username: profile.username,
+        username: normalizedUsername,
         bio: bio.trim(),
         avatarUrl: profile.avatarUrl,
       });
@@ -802,6 +890,24 @@ function AccountEditPage() {
               data-testid="input-account-last-name"
             />
           </div>
+        </section>
+        <section className="tg-account-group" aria-labelledby="tg-account-username-label">
+          <h2 className="tg-account-section-label" id="tg-account-username-label">Имя пользователя</h2>
+          <div className="tg-account-username-card">
+            <span aria-hidden="true">@</span>
+            <Input
+              id="tg-account-username"
+              aria-label="Имя пользователя"
+              value={username}
+              onChange={event => setUsername(event.target.value.replace(/^@/, ''))}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={32}
+              data-testid="input-account-username"
+            />
+          </div>
+          <p className="tg-account-username-hint">3–32 символа: латинские буквы, цифры и подчёркивание.</p>
         </section>
         <section className="tg-account-group" aria-labelledby="tg-account-bio-label">
           <h2 className="tg-account-section-label" id="tg-account-bio-label">О себе</h2>

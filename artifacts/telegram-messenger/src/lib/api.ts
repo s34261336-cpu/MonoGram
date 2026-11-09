@@ -65,3 +65,19 @@ export async function apiRequest<T>(
   }
   return payload as T;
 }
+
+export async function apiBlobRequest(path: string, signal?: AbortSignal): Promise<Blob> {
+  const headers = new Headers();
+  const session = readStoredDemoSession();
+  if (session) headers.set('Authorization', `Bearer ${session.sessionToken}`);
+
+  const response = await fetch(path, { headers, signal });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+    const message = typeof payload?.error === 'string'
+      ? payload.error
+      : response.status === 401 ? 'Сессия завершена. Войдите снова.' : 'Не удалось загрузить изображение.';
+    throw new ApiError(message, response.status);
+  }
+  return response.blob();
+}

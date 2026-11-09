@@ -13,3 +13,6 @@ export * from './message';
 export * from './messageInput';
 export * from './messageInputKind';
 export * from './messageKind';
+export * from './requestUploadUrlBody';
+export * from './requestUploadUrlBodyContentType';
+export * from './requestUploadUrlResponse';

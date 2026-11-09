@@ -84,6 +84,59 @@ paths:
           description: Invalid message
         "404":
           description: Chat not found
+  /messenger/uploads/request-url:
+    post:
+      operationId: requestMessengerUploadUrl
+      tags: [chats]
+      summary: Request a private image upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUploadUrlBody"
+      responses:
+        "200":
+          description: Signed upload URL and private object path
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestUploadUrlResponse"
+        "400":
+          description: Invalid file metadata
+        "401":
+          description: Authentication required
+  /messenger/messages/{messageId}/image:
+    get:
+      operationId: getMessengerMessageImage
+      tags: [chats]
+      summary: Get an image attached to a message
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Image visible to conversation members
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Authentication required
+        "404":
+          description: Message or image not found
 components:
   schemas:
     HealthStatus:
@@ -171,4 +224,29 @@ components:
         fileName:
           type: string
       required: [chatId, text, authorName]
+    RequestUploadUrlBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        size:
+          type: integer
+          minimum: 1
+          maximum: 10485760
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+      required: [name, size, contentType]
+    RequestUploadUrlResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+          pattern: "^/objects/uploads/[0-9a-f-]+/[0-9a-f-]+$"
+      required: [uploadURL, objectPath]
 

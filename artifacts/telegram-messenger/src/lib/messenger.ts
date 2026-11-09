@@ -15,6 +15,7 @@ export type DirectMessage = {
   authorName: string;
   authorUsername: string;
   content: string;
+  imageUrl?: string | null;
   createdAt: string;
   isRead?: boolean;
   readAt?: string | null;
@@ -108,11 +109,35 @@ export function sendMessage(input: {
   conversationId: string;
   authorId: string;
   content: string;
+  imagePath?: string;
 }): Promise<DirectMessage> {
   return apiRequest('/api/messenger/messages', {
     method: 'POST',
-    body: json({ conversationId: input.conversationId, content: input.content }),
+    body: json({
+      conversationId: input.conversationId,
+      content: input.content,
+      imagePath: input.imagePath,
+    }),
   });
+}
+
+export async function uploadMessagePhoto(file: File): Promise<string> {
+  const upload = await apiRequest<{ uploadURL: string; objectPath: string }>(
+    '/api/messenger/uploads/request-url',
+    {
+      method: 'POST',
+      body: json({ name: file.name, size: file.size, contentType: file.type }),
+    },
+  );
+  const response = await fetch(upload.uploadURL, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+  if (!response.ok) {
+    throw new Error('Не удалось загрузить фото. Попробуйте ещё раз.');
+  }
+  return upload.objectPath;
 }
 
 export function getChannels(_userId: string): Promise<Channel[]> {

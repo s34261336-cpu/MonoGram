@@ -92,3 +92,37 @@ export const SendMessageResponse = zod.object({
 })
 
 
+/**
+ * @summary Request a private image upload URL
+ */
+export const requestMessengerUploadUrlBodyNameMax = 160;
+
+export const requestMessengerUploadUrlBodySizeMax = 10485760;
+
+
+
+export const RequestMessengerUploadUrlBody = zod.object({
+  "name": zod.string().min(1).max(requestMessengerUploadUrlBodyNameMax),
+  "size": zod.number().int().min(1).max(requestMessengerUploadUrlBodySizeMax),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
+})
+
+export const requestMessengerUploadUrlResponseObjectPathRegExp = new RegExp('^/objects/uploads/[0-9a-f-]+/[0-9a-f-]+$');
+
+
+export const RequestMessengerUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().url(),
+  "objectPath": zod.string().regex(requestMessengerUploadUrlResponseObjectPathRegExp)
+})
+
+
+/**
+ * @summary Get an image attached to a message
+ */
+export const GetMessengerMessageImageParams = zod.object({
+  "messageId": zod.coerce.string()
+})
+
+export const GetMessengerMessageImageResponse = zod.unknown()
+
+
