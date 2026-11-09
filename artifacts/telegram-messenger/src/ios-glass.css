@@ -29,7 +29,7 @@
   --glass-border: rgba(255, 255, 255, .72);
   --glass-edge: inset 0 1px 0 rgba(255, 255, 255, .85), inset 0 -1px 0 rgba(255, 255, 255, .25);
   --glass-shadow: 0 8px 32px rgba(30, 48, 80, .13);
-  --card: rgba(255, 255, 255, .7);
+  --glass-card: rgba(255, 255, 255, .7);
   --tint: rgba(51, 144, 236, .15);
   --hover: rgba(70, 90, 120, .08);
 
@@ -60,7 +60,7 @@
     --glass-border: rgba(255, 255, 255, .11);
     --glass-edge: inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 -1px 0 rgba(255, 255, 255, .03);
     --glass-shadow: 0 10px 36px rgba(0, 0, 0, .38);
-    --card: rgba(30, 42, 58, .72);
+    --glass-card: rgba(30, 42, 58, .72);
     --tint: rgba(74, 163, 240, .2);
     --hover: rgba(255, 255, 255, .07);
     --bubble-in: #1f2d3d;
@@ -111,7 +111,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-edge), var(--glass-shadow);
 }
-.glass-card { background: var(--card); border-radius: 22px; }
+.glass-card { background: var(--glass-card); border-radius: 22px; }
 
 .workspace { height: 100dvh; min-height: 100dvh; display: block; overflow: hidden; background: transparent; }
 .workspace-main { height: 100dvh; min-width: 0; }
@@ -339,7 +339,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .sidebar-empty p, .state-block p, .empty-panel p { font-size: 15px; line-height: 1.45; margin: 6px 0 0; color: var(--text-2); }
 .mono-contact-hint { gap: 6px; color: var(--blue); }
 .mono-contact-hint span { font-size: 15px; color: var(--text-2); }
-.empty-panel { border: 1px solid var(--glass-border); border-radius: 24px; background: var(--card); }
+.empty-panel { border: 1px solid var(--glass-border); border-radius: 24px; background: var(--glass-card); }
 
 /* ---------- Экран переписки ---------- */
 .chat-stage {
@@ -463,7 +463,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .tg-account-section-label { margin: 18px 0 8px; padding: 0 16px; font-size: 13px; font-weight: 600; color: var(--blue); text-transform: none; }
 .tg-account-name-card, .tg-account-bio-card {
   position: relative; overflow: hidden; border-radius: 22px;
-  background: var(--card); border: 1px solid var(--glass-border);
+  background: var(--glass-card); border: 1px solid var(--glass-border);
   -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--glass-edge), var(--glass-shadow);
 }
 .tg-account-name-card input, .tg-account-bio-card textarea {
@@ -480,7 +480,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 /* ---------- Настройки / Контакты ---------- */
 .mono-settings-list {
   display: grid; overflow: hidden; margin-top: 4px; border-radius: 24px;
-  background: var(--card); border: 1px solid var(--glass-border);
+  background: var(--glass-card); border: 1px solid var(--glass-border);
   -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--glass-edge), var(--glass-shadow);
 }
 .mono-settings-row {
@@ -656,3 +656,148 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
 /* явные цвета заголовков (чтобы ничего не перебивало тему) */
 .chat-sidebar-head h1, .chat-top-person b, .row-title, .conversation-details > b, .mobile-back { color: var(--text); }
 .mobile-back { color: var(--blue); }
+
+
+/* ==========================================================================
+   FIXES v2
+   1. единая тема (светлая/тёмная) для ВСЕХ экранов, включая вход и регистрацию
+   2. поиск, 3. чат, 4. вход/регистрация (одинаковые размеры, без лишних надписей)
+   ========================================================================== */
+
+/* ---------- 1. Тема: shadcn/tailwind-токены тоже должны следовать теме ---------- */
+:root {
+  --background: 210 40% 96%; --foreground: 213 40% 10%;
+  --border: 214 20% 86%; --input: 214 20% 86%; --ring: 207 84% 56%;
+  --card-foreground: 213 40% 10%;
+  --popover: 0 0% 100%; --popover-foreground: 213 40% 10%; --popover-border: 214 20% 86%;
+  --primary: 207 84% 56%; --primary-foreground: 0 0% 100%;
+  --secondary: 210 30% 92%; --secondary-foreground: 213 40% 10%;
+  --muted: 210 30% 92%; --muted-foreground: 213 15% 40%;
+  --accent: 210 35% 90%; --accent-foreground: 213 40% 10%;
+  --sidebar: 210 40% 96%; --sidebar-foreground: 213 40% 10%; --sidebar-border: 214 20% 86%;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 213 34% 9%; --foreground: 210 25% 94%;
+    --border: 213 22% 20%; --input: 213 22% 20%; --ring: 205 84% 63%;
+    --card-foreground: 210 25% 94%;
+    --popover: 211 29% 14%; --popover-foreground: 210 25% 94%; --popover-border: 213 22% 20%;
+    --primary: 205 84% 63%; --primary-foreground: 213 34% 9%;
+    --secondary: 211 25% 17%; --secondary-foreground: 210 25% 94%;
+    --muted: 211 25% 17%; --muted-foreground: 212 15% 64%;
+    --accent: 211 25% 18%; --accent-foreground: 210 25% 94%;
+    --sidebar: 213 34% 9%; --sidebar-foreground: 210 25% 94%; --sidebar-border: 213 22% 20%;
+  }
+}
+html, body { background-color: var(--bg-edge); color: var(--text); }
+
+/* ---------- 2. Поиск (чаты, каналы, контакты) ---------- */
+.search-control,
+.directory-search,
+.mono-settings-search,
+.mono-contact-search {
+  height: 46px; margin: 0 0 12px; padding: 0 16px; gap: 10px;
+  display: flex; align-items: center;
+  border-radius: 23px; color: var(--text-2);
+  background: var(--glass); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  box-shadow: var(--glass-edge);
+}
+.search-control svg, .directory-search svg { flex: none; color: var(--text-3); }
+.search-control input, .directory-search input {
+  flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; box-shadow: none;
+  background: transparent !important; color: var(--text); font-size: 16px;
+}
+.search-control input::placeholder, .directory-search input::placeholder { color: var(--text-3); opacity: 1; }
+.search-control:focus-within, .directory-search:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px var(--tint); }
+.directory-toolbar { display: block; }
+.directory-toolbar > span { display: none; }
+
+/* ---------- 3. Чат ---------- */
+/* сообщения прижаты к низу, но ВСЯ история прокручивается (раньше верх обрезался) */
+.message-area { flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+.message-thread { margin-top: auto; justify-content: flex-start; flex: none; padding-bottom: 4px; }
+.message-bubble img, .message-image {
+  display: block; max-width: 100%; max-height: 340px; width: auto; height: auto;
+  margin: -2px -6px 4px; border-radius: 14px; object-fit: cover;
+}
+.composer-attach {
+  width: 40px; height: 40px; flex: none; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--text-2);
+}
+.composer-attach:active { background: var(--hover); }
+
+@media (max-width: 680px) {
+  /* экран чата — на весь экран поверх нижней панели, без «дыры» внизу */
+  .chat-open .chat-stage {
+    position: fixed; inset: 0; z-index: 50;
+    height: 100dvh; max-height: 100dvh;
+  }
+  .chat-open .mono-tabbar { display: none; }
+  .composer { margin-bottom: calc(10px + var(--safe-b)); }
+}
+
+/* ---------- 4. Вход / регистрация ---------- */
+.auth-page {
+  min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px;
+  background-color: var(--bg-edge);
+  background-image:
+    radial-gradient(60% 40% at 85% 6%, var(--bg-c), transparent 70%),
+    radial-gradient(55% 45% at 6% 92%, var(--bg-b), transparent 70%),
+    linear-gradient(170deg, var(--bg-a), var(--bg-edge));
+  color: var(--text);
+}
+.auth-page::before, .auth-orbit { display: none; }
+.auth-panel {
+  width: min(100%, 420px); padding: 28px 22px 22px; border-radius: 28px; color: var(--text);
+  background: var(--glass-card); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+}
+.brand-lockup { color: var(--text); font-size: 20px; font-weight: 700; }
+.brand-lockup .brand-icon { color: #fff; background: linear-gradient(155deg, #55adf8, #2580d8); }
+.brand-period { color: var(--blue); }
+
+/* лишние надписи убираем */
+.auth-kicker, .auth-foot, .auth-side-note { display: none !important; }
+
+.auth-panel h1 {
+  margin: 22px 0 8px; font-size: 26px; font-weight: 700; line-height: 1.2;
+  color: var(--text); text-align: center; letter-spacing: 0;
+}
+.auth-description { max-width: none; margin: 0 0 20px; font-size: 15px; line-height: 1.4; color: var(--text-2); text-align: center; }
+.auth-panel label { font-size: 13px; font-weight: 600; color: var(--blue); }
+
+/* единые размеры: все тексты 15–16px, поля 52px */
+.auth-panel :is(p, span, small, label, a, li) { font-size: 15px; line-height: 1.4; letter-spacing: 0; }
+.auth-panel input:not([type="checkbox"]):not([type="radio"]) {
+  width: 100%; height: 52px; min-height: 52px; padding: 0 16px;
+  border: 1px solid var(--sep); border-radius: 16px; outline: 0; box-shadow: none;
+  background: var(--hover) !important; color: var(--text); font-size: 17px;
+}
+.auth-panel input::placeholder { color: var(--text-3); opacity: 1; }
+.auth-panel input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--tint); }
+/* ячейки кода — ровный ряд */
+.auth-panel input[inputmode="numeric"][maxlength="1"],
+.auth-panel input[maxlength="1"] {
+  width: 100%; min-width: 0; padding: 0; text-align: center; font-size: 22px; font-weight: 600;
+}
+.auth-panel :is([class*="otp"], [class*="code-inputs"], [class*="code-row"], [class*="digits"]) {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 6px 0 14px;
+}
+/* блок «демо-код»: подпись и цифры одного размера, по центру */
+.auth-panel [class*="demo"] {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px;
+  margin: 0 0 16px; padding: 12px 14px; border-radius: 16px;
+  background: var(--tint); color: var(--text); font-size: 16px; font-weight: 600; text-align: center;
+}
+.auth-panel [class*="demo"] :is(b, strong, span, code) {
+  font-size: 16px !important; font-weight: 700; letter-spacing: .12em; color: var(--blue); line-height: 1.4;
+}
+.auth-submit { width: 100%; height: 52px; margin-top: 12px; justify-content: center; }
+.auth-submit > *:first-child { margin-left: 0; }
+.submit-arrow { margin-left: 0; }
+.auth-switch { margin-top: 16px; text-align: center; font-size: 15px; color: var(--text-2); }
+.auth-switch button { color: var(--blue); font-size: 15px; font-weight: 600; background: none; border: 0; }
+.form-error { margin: 8px 0 0; font-size: 14px; color: var(--red); text-align: center; }
+.boot-screen { background: transparent; }
