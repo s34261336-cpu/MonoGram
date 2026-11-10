@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, Router as WouterRouter, Link, useLocation, useParams } from 'wouter';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
@@ -392,7 +392,7 @@ function ChatWorkspace() {
   const [error, setError] = useState('');
   const setUnreadChatsCount = useContext(UnreadChatsCountContext);
   const { markRead, unreadCountFor } = useChatReadState(user?.id || '');
-  const endRef = useRef<HTMLDivElement>(null);
+  const messageAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const searchUsers = useUserSearch(username.replace(/^@/, ''), user?.id || '');
   const filtered = useMemo(() => chats.filter(c => `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru'))), [chats, search]);
@@ -402,7 +402,11 @@ function ChatWorkspace() {
     const preview = pendingImage?.preview;
     return () => { if (preview) URL.revokeObjectURL(preview); };
   }, [pendingImage?.preview]);
-  useEffect(() => { if (messagesQuery.data?.length) endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messagesQuery.data?.length, id]);
+  useLayoutEffect(() => {
+    const messageArea = messageAreaRef.current;
+    if (!id || !messageArea || messagesQuery.isLoading || !messagesQuery.data) return;
+    messageArea.scrollTop = messageArea.scrollHeight;
+  }, [id, messagesQuery.data?.length, messagesQuery.isLoading]);
   useEffect(() => { setUnreadChatsCount(unreadChatsCount); }, [setUnreadChatsCount, unreadChatsCount]);
   useEffect(() => {
     if (id && current?.lastMessage) markRead(id);
@@ -531,11 +535,11 @@ function ChatWorkspace() {
     <section className="chat-stage">
       {current ? <>
          <header className="chat-topbar glass-surface"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={presence.onlineUserIds.includes(current.person.id) ? 'presence-online' : ''}>{presence.onlineUserIds.includes(current.person.id) ? 'В сети' : `@${current.person.username}`}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>@{current.person.username}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
-         <div className="message-area">
+         <div className="message-area" ref={messageAreaRef}>
           {messagesQuery.isLoading ? <div className="message-skeleton"><i/><i/><i/></div> : messagesQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Переписка сохранена. Попробуйте ещё раз." action="Повторить" onAction={() => messagesQuery.refetch()} /> : messages.length === 0 ? <div className="chat-welcome"><span className="welcome-symbol"><MessageCircle size={23}/></span><span className="overline">ЛИЧНАЯ ПЕРЕПИСКА</span><h2>Поздоровайтесь с {current.person.displayName.split(' ')[0]}.</h2><p>Эту переписку видите только вы и собеседник.</p></div> : <div className="message-thread">{messages.map((message: DirectMessage) => {
             const mine = message.authorId === user?.id;
              return <div className={`message-row ${mine ? 'mine' : ''}`} key={message.id} data-testid={`message-${message.id}`}><div className="message-bubble">{message.imageUrl && <MessageImage src={message.imageUrl} />}{message.content && <p>{message.content}</p>}<time>{clock(message.createdAt)} {mine && <Check size={12}/>}</time></div></div>;
-          })}<div ref={endRef}/></div>}
+          })}</div>}
         </div>
          <form className={`composer ${pendingImage ? 'composer--with-image' : ''}`} onSubmit={send}>
            {pendingImage && <div className="composer-image-preview"><img src={pendingImage.preview} alt="Фото для отправки"/><span>{pendingImage.file.name}</span><button type="button" aria-label="Убрать фото" onClick={() => setPendingImage(null)} data-testid="button-remove-chat-image"><X size={16}/></button></div>}
@@ -587,7 +591,7 @@ function ChannelsPage() {
     <PageHeader kicker="ОТКРЫТЫЕ СООБЩЕСТВА" title="Каналы" description="Читайте авторов, которые вам интересны, и делитесь своими мыслями." action={<button className="primary-button" onClick={() => setModal(true)} data-testid="button-create-channel"><Plus size={16}/> Создать канал</button>}/>
     <div className="directory-toolbar"><div className="search-control directory-search"><Search size={16}/><input aria-label="Поиск по каналам" value={filter} onChange={e => setFilter(e.target.value)} placeholder="Найти канал" data-testid="input-channel-search"/></div><span>{query.isLoading ? 'Загрузка…' : `${channels.length} ${channelCountLabel(channels.length)}`}</span></div>
     {query.isLoading ? <div className="channel-grid">{[1,2,3].map(i=><div className="channel-skeleton glass-card" key={i}><i/><b/><span/></div>)}</div> : query.isError ? <StateBlock title="Каналы недоступны" detail="Проверьте подключение к интернету." action="Повторить" onAction={() => query.refetch()}/> : shown.length === 0 ? <div className="empty-panel"><div className="empty-mark"><Compass size={21}/></div><h2>{filter ? 'Ничего не найдено' : 'Здесь пока пусто'}</h2><p>{filter ? 'Попробуйте другое название или имя пользователя.' : 'Здесь появятся каналы, на которые вы подпишетесь. Создайте канал, если хотите чем-то поделиться.'}</p>{!filter && <button className="outline-button" onClick={() => setModal(true)} data-testid="button-create-first-channel"><Plus size={15}/> Создать канал</button>}</div> : <div className="channel-grid">{shown.map((channel: Channel, index) => <ChannelCard key={channel.id} channel={channel} index={index}/>)}</div>}
-    {modal && <div className="modal-backdrop"><section className="dialog glass-card"><button className="dialog-close" onClick={() => setModal(false)} aria-label="Закрыть"><X size={18}/></button><span className="overline">МЕСТО ДЛЯ ВАШИХ ИДЕЙ</span><h2>Создать канал</h2><p>Придумайте название и короткое имя для поиска.</p><Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack">
+    {modal && <div className="modal-backdrop"><section className="dialog glass-card"><button className="dialog-close" onClick={() => setModal(false)} aria-label="Закрыть"><X size={18}/></button><h2>Создать канал</h2><p>Придумайте название и короткое имя для поиска.</p><Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack">
       <FormField control={form.control} name="title" rules={{ required: 'Введите название канала.' }} render={({field})=><FormItem><FormLabel>Название канала</FormLabel><FormControl><Input placeholder="Например, «Идеи на выходные»" {...field} data-testid="input-channel-title"/></FormControl><FormMessage/></FormItem>}/>
       <FormField control={form.control} name="username" rules={{required:'Придумайте имя пользователя.',pattern:{value:/^[a-z][a-z0-9_]{2,31}$/i,message:'От 3 до 32 латинских букв, цифр или знаков подчёркивания.'}}} render={({field})=><FormItem><FormLabel>Имя пользователя</FormLabel><FormControl><div className="input-prefix"><span>@</span><Input placeholder="primer_kanala" {...field} data-testid="input-channel-username"/></div></FormControl><FormMessage/></FormItem>}/>
       <FormField control={form.control} name="description" render={({field})=><FormItem><FormLabel>Описание</FormLabel><FormControl><Textarea placeholder="О чём будет этот канал?" {...field} data-testid="input-channel-description"/></FormControl><FormMessage/></FormItem>}/>
@@ -723,9 +727,6 @@ function ProfilePage() {
         <span className="mono-screen-header-spacer" aria-hidden="true"/>
         <h2>Профиль</h2>
         <div className="mono-screen-header-actions">
-          <button type="button" aria-label="Поиск контактов" title="Поиск контактов" onClick={() => setPath('/contacts')} data-testid="button-profile-search">
-            <Search size={21}/>
-          </button>
           <button type="button" aria-label="Дополнительные действия" title="Дополнительные действия" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen(value => !value)} data-testid="button-profile-menu">
             <MoreVertical size={21}/>
           </button>

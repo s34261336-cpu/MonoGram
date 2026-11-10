@@ -255,7 +255,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chat-header-menu button:active, .mono-screen-menu button:active, .tg-profile-bio-menu button:active, .tg-profile-username-menu button:active { background: var(--tint); }
 .tg-profile-bio-menu.glass-card, .tg-profile-username-menu.glass-card { background: var(--glass-strong); border-radius: 22px; }
 .tg-profile-bio-menu { left: 16px; right: auto; top: calc(100% - 6px); transform-origin: top left; }
-.tg-profile-username-menu { left: 16px; right: auto; top: calc(100% - 6px); transform-origin: top left; }
+.tg-profile-username-menu {
+  left: 16px; right: auto; top: auto; bottom: calc(100% - 6px);
+  transform-origin: bottom left;
+}
 @keyframes pop-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 
 /* ---------- Страницы ---------- */
@@ -362,7 +365,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .conversation-details span, .conversation-details small { color: var(--text-2); font-size: 14px; display: flex; align-items: center; gap: 6px; }
 .conversation-details p { margin: 6px 0 0; font-size: 15px; }
 
-.message-area { min-height: 0; flex: 1; display: flex; overflow-y: auto; padding: 14px 12px 8px; -webkit-overflow-scrolling: touch; }
+.message-area { min-height: 0; flex: 1; display: flex; overflow-y: auto; overflow-anchor: none; padding: 14px 12px 8px; -webkit-overflow-scrolling: touch; }
 .message-thread { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; }
 .message-row { display: flex; align-items: flex-end; }
 .message-row.mine { justify-content: flex-end; }
