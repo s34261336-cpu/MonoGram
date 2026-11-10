@@ -363,7 +363,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   return <UnreadChatsCountContext.Provider value={setUnreadChatsCount}>
     <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`}>
       <div className="workspace-main">{children}</div>
-      <Navigation profile={profile} hidden={inConversation || path === '/profile/edit'} unreadChatsCount={unreadChatsCount} />
+      <Navigation profile={profile} hidden={inConversation || path === '/profile/edit' || path === '/profile/username'} unreadChatsCount={unreadChatsCount} />
     </div>
   </UnreadChatsCountContext.Provider>;
 }
@@ -635,22 +635,31 @@ function ProfilePage() {
   const [saved,setSaved] = useState(false);
   const [editing,setEditing] = useState(false);
   const [bioMenuOpen,setBioMenuOpen] = useState(false);
+  const [usernameMenuOpen,setUsernameMenuOpen] = useState(false);
   const [profileMenuOpen,setProfileMenuOpen] = useState(false);
   const [bioNotice,setBioNotice] = useState('');
+  const [usernameNotice,setUsernameNotice] = useState('');
   const bioMenuRef = useRef<HTMLDivElement>(null);
+  const usernameMenuRef = useRef<HTMLDivElement>(null);
   const form = useForm<{username:string;avatarUrl:string}>({defaultValues:{username:'',avatarUrl:''}});
   const profile = query.data;
   const initialized = useRef('');
   useEffect(()=>{if(profile && initialized.current !== profile.id){initialized.current=profile.id;form.reset({username:profile.username,avatarUrl:profile.avatarUrl||''});}},[profile,form]);
   useEffect(() => {
-    if (!bioMenuOpen) return;
+    if (!bioMenuOpen && !usernameMenuOpen) return;
     function closeMenu(event: PointerEvent) {
-      if (event.target instanceof Node && !bioMenuRef.current?.contains(event.target)) {
+      if (event.target instanceof Node && bioMenuOpen && !bioMenuRef.current?.contains(event.target)) {
         setBioMenuOpen(false);
+      }
+      if (event.target instanceof Node && usernameMenuOpen && !usernameMenuRef.current?.contains(event.target)) {
+        setUsernameMenuOpen(false);
       }
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setBioMenuOpen(false);
+      if (event.key === 'Escape') {
+        setBioMenuOpen(false);
+        setUsernameMenuOpen(false);
+      }
     }
     document.addEventListener('pointerdown', closeMenu);
     document.addEventListener('keydown', closeOnEscape);
@@ -658,11 +667,29 @@ function ProfilePage() {
       document.removeEventListener('pointerdown', closeMenu);
       document.removeEventListener('keydown', closeOnEscape);
     };
-  }, [bioMenuOpen]);
+  }, [bioMenuOpen,usernameMenuOpen]);
   async function submit(v:{username:string;avatarUrl:string}){if(!user || !profile)return;setSaved(false);try{await save.mutateAsync({id:user.id,displayName:profile.displayName,username:v.username,bio:profile.bio,avatarUrl:v.avatarUrl||null});setSaved(true);}catch(e){form.setError('root',{message:userError(e,'Не удалось сохранить профиль.')});}}
   function openBioEditor() {
     setBioMenuOpen(false);
     setPath('/profile/edit');
+  }
+  function openUsernameEditor() {
+    setUsernameMenuOpen(false);
+    setPath('/profile/username');
+  }
+  async function copyUsername() {
+    const username = profile?.username.trim() ?? '';
+    setUsernameMenuOpen(false);
+    if (!username) {
+      setUsernameNotice('Имя пользователя пока не задано.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`@${username}`);
+      setUsernameNotice('Имя пользователя скопировано.');
+    } catch {
+      setUsernameNotice('Не удалось скопировать имя пользователя.');
+    }
   }
   async function copyBio() {
     const bio = profile?.bio?.trim() ?? '';
@@ -742,7 +769,7 @@ function ProfilePage() {
             type="button"
             aria-haspopup="menu"
             aria-expanded={bioMenuOpen}
-            onClick={() => { setBioNotice(''); setBioMenuOpen(value => !value); }}
+            onClick={() => { setBioNotice(''); setUsernameMenuOpen(false); setBioMenuOpen(value => !value); }}
             data-testid="button-profile-bio-menu"
           >
             <p>{profile?.bio?.trim() || 'Добавьте пару слов о себе'}</p>
@@ -757,17 +784,35 @@ function ProfilePage() {
             </button>
           </div>}
         </div>
-        <div className="tg-profile-info-row">
-          <p className="tg-profile-username">@{profile?.username || 'username'}</p>
-          <span>Имя пользователя</span>
+        <div className="tg-profile-info-row tg-profile-username-row" ref={usernameMenuRef}>
+          <button
+            className="tg-profile-username-trigger"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={usernameMenuOpen}
+            onClick={() => { setUsernameNotice(''); setBioMenuOpen(false); setUsernameMenuOpen(value => !value); }}
+            data-testid="button-profile-username-menu"
+          >
+            <p className="tg-profile-username">@{profile?.username || 'username'}</p>
+            <span>Имя пользователя</span>
+          </button>
+          {usernameMenuOpen && <div className="tg-profile-username-menu glass-card" role="menu" aria-label="Действия с именем пользователя">
+            <button type="button" role="menuitem" onClick={() => void copyUsername()} data-testid="button-copy-profile-username">
+              <Copy size={16}/><span>Копировать имя</span>
+            </button>
+            <button type="button" role="menuitem" onClick={openUsernameEditor} data-testid="button-edit-profile-username">
+              <PenLine size={16}/><span>Изменить имя</span>
+            </button>
+          </div>}
         </div>
       </section>
       {bioNotice && <p className="tg-profile-bio-notice" role="status">{bioNotice}</p>}
+      {usernameNotice && <p className="tg-profile-username-notice" role="status">{usernameNotice}</p>}
 
       {editing && <section className="tg-profile-edit glass-card" aria-label="Редактирование профиля">
         <h2>Редактировать профиль</h2>
       <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack profile-form">
-        <FormField control={form.control} name="username" rules={{required:'Укажите имя пользователя.',pattern:{value:/^[a-z][a-z0-9_]{2,31}$/,message:'От 3 до 32 строчных латинских букв, цифр или знаков подчёркивания.'}}} render={({field})=><FormItem><FormLabel>Имя пользователя</FormLabel><FormControl><div className="input-prefix"><span>@</span><Input {...field} data-testid="input-profile-username"/></div></FormControl><FormMessage/></FormItem>}/>
+        <FormField control={form.control} name="username" rules={{required:'Укажите имя пользователя.',pattern:{value:/^[a-z][a-z0-9_]{4,31}$/,message:'От 5 до 32 строчных латинских букв, цифр или знаков подчёркивания.'}}} render={({field})=><FormItem><FormLabel>Имя пользователя</FormLabel><FormControl><div className="input-prefix"><span>@</span><Input {...field} data-testid="input-profile-username"/></div></FormControl><FormMessage/></FormItem>}/>
         <FormField control={form.control} name="avatarUrl" render={({field})=><FormItem><FormLabel>Ссылка на фото профиля</FormLabel><FormControl><Input type="url" placeholder="https://…" {...field} data-testid="input-profile-avatar"/></FormControl><FormMessage/></FormItem>}/>
         {form.formState.errors.root&&<p className="form-error">{form.formState.errors.root.message}</p>}
         <div className="form-actions">{saved&&<span className="saved-note"><Check size={15}/> Изменения сохранены</span>}<Button className="primary-button" disabled={save.isPending} data-testid="button-save-profile">{save.isPending?'Сохраняем…':'Сохранить изменения'}</Button></div>
@@ -824,8 +869,8 @@ function AccountEditPage() {
       return;
     }
     const normalizedUsername = username.trim().replace(/^@/, '').toLowerCase();
-    if (!/^[a-z][a-z0-9_]{2,31}$/.test(normalizedUsername)) {
-      setError('Имя пользователя: от 3 до 32 латинских букв, цифр или знаков подчёркивания.');
+    if (!/^[a-z][a-z0-9_]{4,31}$/.test(normalizedUsername)) {
+      setError('Имя пользователя: от 5 до 32 латинских букв, цифр или знаков подчёркивания.');
       return;
     }
 
@@ -907,7 +952,7 @@ function AccountEditPage() {
               data-testid="input-account-username"
             />
           </div>
-          <p className="tg-account-username-hint">3–32 символа: латинские буквы, цифры и подчёркивание.</p>
+          <p className="tg-account-username-hint">5–32 символа: латинские буквы, цифры и подчёркивание.</p>
         </section>
         <section className="tg-account-group" aria-labelledby="tg-account-bio-label">
           <h2 className="tg-account-section-label" id="tg-account-bio-label">О себе</h2>
@@ -926,6 +971,100 @@ function AccountEditPage() {
             <span className="tg-account-counter">{bio.length}/280</span>
           </div>
         </section>
+        {error && <p className="form-error tg-account-error" role="alert">{error}</p>}
+      </form>}
+    </div>
+  </div>;
+}
+
+function UsernameEditPage() {
+  const { user } = useAuth();
+  const [, setPath] = useLocation();
+  const query = useProfile(user?.id || '');
+  const save = useSaveProfile();
+  const profile = query.data;
+  const [username, setUsername] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (profile) {
+      setUsername(profile.username);
+      setError('');
+    }
+  }, [profile?.id, profile?.username]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user || !profile) return;
+
+    const normalizedUsername = username.trim().replace(/^@/, '').toLowerCase();
+    if (!/^[a-z][a-z0-9_]{4,31}$/.test(normalizedUsername)) {
+      setError('Имя пользователя должно содержать от 5 до 32 символов: латинские буквы, цифры или подчёркивание.');
+      return;
+    }
+
+    setError('');
+    try {
+      await save.mutateAsync({
+        id: user.id,
+        displayName: profile.displayName,
+        username: normalizedUsername,
+        bio: profile.bio,
+        avatarUrl: profile.avatarUrl,
+      });
+      setPath('/profile');
+    } catch (saveError) {
+      setError(userError(saveError, 'Не удалось сохранить имя пользователя.'));
+    }
+  }
+
+  return <div className="tg-account-page tg-username-page">
+    <div className="tg-account-screen">
+      <header className="tg-account-header">
+        <button type="button" className="tg-account-back" onClick={() => setPath('/profile')} aria-label="Назад в профиль" data-testid="button-username-back">
+          <ArrowLeft size={21}/>
+        </button>
+        <h1>Имя пользователя</h1>
+        <button
+          type="submit"
+          form="tg-username-edit-form"
+          className="tg-account-save"
+          aria-label="Сохранить"
+          title="Сохранить"
+          disabled={save.isPending || !profile}
+          data-testid="button-username-save"
+        >
+          {save.isPending ? <LoaderCircle size={20} className="spin"/> : <Check size={21}/>}
+        </button>
+      </header>
+
+      {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? (
+        <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={() => query.refetch()}/>
+      ) : profile && <form id="tg-username-edit-form" className="tg-account-form tg-username-form" onSubmit={event => void submit(event)}>
+        <section className="tg-account-group" aria-labelledby="tg-username-section-label">
+          <h2 className="tg-account-section-label" id="tg-username-section-label">Задать имя пользователя</h2>
+          <div className="tg-account-username-card">
+            <span aria-hidden="true">@</span>
+            <Input
+              id="tg-profile-username-edit"
+              aria-label="Имя пользователя"
+              aria-describedby="tg-username-description tg-username-rules"
+              value={username}
+              onChange={event => setUsername(event.target.value.replace(/^@/, ''))}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={32}
+              data-testid="input-profile-username-edit"
+            />
+          </div>
+        </section>
+        <p className="tg-username-description" id="tg-username-description">
+          Вы можете выбрать публичное имя пользователя в MonoGram. По нему другие люди смогут найти вас и связаться с вами, не зная вашего телефона.
+        </p>
+        <p className="tg-username-rules" id="tg-username-rules">
+          Можно использовать символы a–z, 0–9 и подчёркивание. Минимальная длина — 5 символов, максимальная — 32.
+        </p>
         {error && <p className="form-error tg-account-error" role="alert">{error}</p>}
       </form>}
     </div>
@@ -1090,6 +1229,7 @@ function AppRoutes() {
     <Route path="/channels" component={ChannelsPage}/>
     <Route path="/channels/:channelId" component={ChannelPage}/>
     <Route path="/profile/edit" component={AccountEditPage}/>
+    <Route path="/profile/username" component={UsernameEditPage}/>
     <Route path="/profile" component={ProfilePage}/>
     <Route path="/stars" component={StarsPage}/>
     <Route component={NotFound}/>

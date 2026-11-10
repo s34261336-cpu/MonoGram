@@ -118,7 +118,7 @@ router.patch('/profile', handleRoute(async (req, res) => {
   const bio = typeof req.body?.bio === 'string' ? req.body.bio.trim().slice(0, 280) : '';
   const avatarUrl = typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl.trim() || null : null;
   if (displayName.length < 2 || displayName.length > 80) throw apiError('Имя должно содержать от 2 до 80 символов.');
-  if (!/^[a-z][a-z0-9_]{2,31}$/.test(username)) throw apiError('Юзернейм: латинская буква в начале и 3–32 символа.');
+  if (!/^[a-z][a-z0-9_]{4,31}$/.test(username)) throw apiError('Имя пользователя: латинская буква в начале и от 5 до 32 символов.');
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update({ display_name: displayName, username, bio, avatar_url: avatarUrl, updated_at: new Date().toISOString() })

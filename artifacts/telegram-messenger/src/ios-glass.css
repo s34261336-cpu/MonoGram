@@ -232,7 +232,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .page-header > .primary-button, .page-header > button { grid-column: 1; width: 100%; }
 
 /* ---------- Выпадающие меню (теперь плотные, текст читается) ---------- */
-.chat-header-menu, .mono-screen-menu, .tg-profile-bio-menu, .conversation-details {
+.chat-header-menu, .mono-screen-menu, .tg-profile-bio-menu, .tg-profile-username-menu, .conversation-details {
   position: absolute; z-index: 60;
   top: calc(100% + 10px); right: 0; left: auto;
   min-width: 232px; padding: 6px; margin: 0;
@@ -244,17 +244,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   animation: pop-in .18s cubic-bezier(.3, .9, .3, 1);
   transform-origin: top right;
 }
-.chat-header-menu button, .mono-screen-menu button, .tg-profile-bio-menu button {
+.chat-header-menu button, .mono-screen-menu button, .tg-profile-bio-menu button, .tg-profile-username-menu button {
   width: 100%; min-height: 48px; padding: 0 14px;
   display: flex; align-items: center; gap: 12px;
   border: 0; border-radius: 16px; background: transparent;
   color: var(--text); font-size: 16px; font-weight: 500; text-align: left; opacity: 1;
 }
-.chat-header-menu button svg, .tg-profile-bio-menu button svg { color: var(--blue); flex: none; }
-.chat-header-menu button:hover, .mono-screen-menu button:hover, .tg-profile-bio-menu button:hover { background: var(--hover); }
-.chat-header-menu button:active, .mono-screen-menu button:active, .tg-profile-bio-menu button:active { background: var(--tint); }
-.tg-profile-bio-menu.glass-card { background: var(--glass-strong); border-radius: 22px; }
+.chat-header-menu button svg, .tg-profile-bio-menu button svg, .tg-profile-username-menu button svg { color: var(--blue); flex: none; }
+.chat-header-menu button:hover, .mono-screen-menu button:hover, .tg-profile-bio-menu button:hover, .tg-profile-username-menu button:hover { background: var(--hover); }
+.chat-header-menu button:active, .mono-screen-menu button:active, .tg-profile-bio-menu button:active, .tg-profile-username-menu button:active { background: var(--tint); }
+.tg-profile-bio-menu.glass-card, .tg-profile-username-menu.glass-card { background: var(--glass-strong); border-radius: 22px; }
 .tg-profile-bio-menu { left: 16px; right: auto; top: calc(100% - 6px); transform-origin: top left; }
+.tg-profile-username-menu { left: 16px; right: auto; top: calc(100% - 6px); transform-origin: top left; }
 @keyframes pop-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 
 /* ---------- Страницы ---------- */
@@ -444,8 +445,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .tg-profile-bio-row { padding: 0; }
 .tg-profile-bio-trigger { width: 100%; display: grid; gap: 3px; padding: 13px 18px; text-align: left; border: 0; background: transparent; color: inherit; border-radius: 0; }
 .tg-profile-bio-trigger:active { background: var(--hover); }
+.tg-profile-username-row { padding: 0; }
+.tg-profile-username-trigger { width: 100%; display: grid; gap: 3px; padding: 13px 18px; text-align: left; border: 0; background: transparent; color: inherit; border-radius: 0; cursor: pointer; }
+.tg-profile-username-trigger:active { background: var(--hover); }
+.tg-profile-username-trigger:focus-visible { outline: 2px solid var(--blue); outline-offset: -3px; }
+.tg-profile-username-trigger p { margin: 0; font-size: 17px; line-height: 1.3; color: var(--text); }
 .tg-profile-username { color: var(--blue) !important; }
-.tg-profile-bio-notice { margin: 10px 0 0; text-align: center; font-size: 14px; color: var(--text-2); }
+.tg-profile-bio-notice, .tg-profile-username-notice { margin: 10px 0 0; text-align: center; font-size: 14px; color: var(--text-2); }
 .tg-profile-edit { margin-top: 14px; padding: 18px; }
 .tg-profile-edit h2 { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
 
@@ -924,6 +930,9 @@ html, body { background-color: var(--bg-edge); color: var(--text); }
 }
 .tg-account-username-card input { min-width: 0; flex: 1; height: 48px; border: 0; background: transparent !important; color: var(--text); box-shadow: none; }
 .tg-account-username-hint { margin: 7px 3px 0; color: var(--text-2); font-size: 13px; }
+.tg-username-form { gap: 12px; padding-top: 2px; }
+.tg-username-description, .tg-username-rules { margin: 7px 4px 0; color: var(--text-2); font-size: 15px; line-height: 1.45; }
+.tg-username-rules { margin-top: 8px; }
 @media (max-width: 540px) {
   .mono-auth { padding: 18px 14px calc(18px + var(--safe-b)); }
   .mono-auth .mono-auth__card { padding: 24px 20px calc(18px + var(--safe-b)); border-radius: 26px; }
