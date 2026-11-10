@@ -396,6 +396,11 @@ function ChatWorkspace() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const searchUsers = useUserSearch(username.replace(/^@/, ''), user?.id || '');
   const normalizedChatSearch = search.trim().toLocaleLowerCase('ru').replace(/^@+/, '');
+  const chatUserSearch = useUserSearch(normalizedChatSearch, user?.id || '');
+  const chatUserResults = useMemo(() => {
+    const existingUserIds = new Set(chats.map(chat => chat.person.id));
+    return (chatUserSearch.data || []).filter(person => !existingUserIds.has(person.id));
+  }, [chats, chatUserSearch.data]);
   const filtered = useMemo(() => chats.filter(c => (
     `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`
       .toLocaleLowerCase('ru')
@@ -461,7 +466,7 @@ function ChatWorkspace() {
   }
   async function beginChat(value = username) {
     setStartError('');
-    try { const conversationId = await startConversation.mutateAsync(value.trim().replace(/^@/, '')); setNewChat(false); setUsername(''); setPath(`/chat/${encodeURIComponent(conversationId)}`); }
+    try { const conversationId = await startConversation.mutateAsync(value.trim().replace(/^@/, '')); setNewChat(false); setUsername(''); setSearch(''); setPath(`/chat/${encodeURIComponent(conversationId)}`); }
     catch (e) { setStartError(userError(e, 'Не удалось начать переписку.')); }
   }
   const messages = messagesQuery.data || [];
@@ -507,34 +512,61 @@ function ChatWorkspace() {
         </header>
         <div className="search-control chat-search glass-surface">
           <Search size={17} aria-hidden="true" />
-          <input aria-label="Поиск чатов" value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск чатов" data-testid="input-chat-search" />
+          <input aria-label="Поиск чатов и пользователей" value={search} onChange={e => { setSearch(e.target.value); setStartError(''); }} placeholder="Поиск чатов" data-testid="input-chat-search" />
           {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск"><X size={16} /></button>}
         </div>
       </div>
       <div className="conversation-list">
-        {chatsQuery.isLoading ? <div className="list-skeleton">{[1,2,3,4].map(i => <div className="skeleton-chat" key={i}><i/><span/><b/></div>)}</div> : chatsQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => chatsQuery.refetch()} /> : filtered.length === 0 ? <div className="sidebar-empty"><div className="empty-mark"><MessageCircle size={19}/></div><b>{search ? 'Ничего не найдено' : 'Пока здесь тихо'}</b><p>{search ? 'Попробуйте другое имя или никнейм.' : 'Найдите человека по имени пользователя, чтобы начать личную переписку.'}</p>{!search && <button className="text-action" onClick={() => setNewChat(true)} data-testid="button-start-first-chat">Найти человека <ArrowLeft size={14}/></button>}</div> : filtered.map((chat: Conversation) => {
-          const unreadCount = unreadCountFor(chat);
-          const lastMessage = chat.lastMessage;
-          const isOwnMessage = lastMessage?.authorId === user?.id;
-          const isRead = lastMessage?.isRead === true || Boolean(lastMessage?.readAt);
-          return <button className={`conversation-row ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
-          <Avatar profile={chat.person} />
-          <span className="conversation-row-copy">
-            <span className="row-title"><span className="row-name">{chat.person.displayName}</span><time>{clock(lastMessage?.createdAt)}</time></span>
-            <span className="row-bottom">
-              <span className="row-preview">
-                {isOwnMessage && (isRead
-                  ? <CheckCheck size={16} className="row-read-check" aria-label="Прочитано" />
-                  : <Check size={14} className="row-sent-check" aria-label="Отправлено" />)}
-                <span className="row-preview-text">{lastMessage ? `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.content || (lastMessage.imageUrl ? 'Фото' : '')}` : 'Сообщений пока нет'}</span>
+        {chatsQuery.isLoading ? <div className="list-skeleton">{[1,2,3,4].map(i => <div className="skeleton-chat" key={i}><i/><span/><b/></div>)}</div> : chatsQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => chatsQuery.refetch()} /> : <>
+          {startError && !newChat && <StateBlock title="Не удалось начать переписку" detail={startError} />}
+          {filtered.map((chat: Conversation) => {
+            const unreadCount = unreadCountFor(chat);
+            const lastMessage = chat.lastMessage;
+            const isOwnMessage = lastMessage?.authorId === user?.id;
+            const isRead = lastMessage?.isRead === true || Boolean(lastMessage?.readAt);
+            return <button className={`conversation-row ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
+              <Avatar profile={chat.person} />
+              <span className="conversation-row-copy">
+                <span className="row-title"><span className="row-name">{chat.person.displayName}</span><time>{clock(lastMessage?.createdAt)}</time></span>
+                <span className="row-bottom">
+                  <span className="row-preview">
+                    {isOwnMessage && (isRead
+                      ? <CheckCheck size={16} className="row-read-check" aria-label="Прочитано" />
+                      : <Check size={14} className="row-sent-check" aria-label="Отправлено" />)}
+                    <span className="row-preview-text">{lastMessage ? `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.content || (lastMessage.imageUrl ? 'Фото' : '')}` : 'Сообщений пока нет'}</span>
+                  </span>
+                  {unreadCount > 0 && <span className="conversation-unread" aria-label={`${unreadCount} непрочитанных`}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>}
+                </span>
               </span>
-              {unreadCount > 0 && <span className="conversation-unread" aria-label={`${unreadCount} непрочитанных`}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>}
+            </button>;
+          })}
+          {normalizedChatSearch.length >= 2 && chatUserSearch.isLoading && filtered.length === 0 && <div className="list-skeleton">{[1,2].map(i => <div className="skeleton-chat" key={`search-${i}`}><i/><span/><b/></div>)}</div>}
+          {normalizedChatSearch.length >= 2 && chatUserSearch.isError && <StateBlock title="Поиск пользователей недоступен" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => { void chatUserSearch.refetch(); }} />}
+          {chatUserResults.map(person => <button
+            type="button"
+            className="conversation-row"
+            key={`user-${person.id}`}
+            onClick={() => void beginChat(person.username)}
+            disabled={startConversation.isPending}
+            data-testid={`chat-search-user-${person.id}`}
+          >
+            <Avatar profile={person} />
+            <span className="conversation-row-copy">
+              <span className="row-title"><span className="row-name">{person.displayName}</span></span>
+              <span className="row-bottom">
+                <span className="row-preview"><span className="row-preview-text">@{person.username} · Начать переписку</span></span>
+              </span>
             </span>
-          </span>
-        </button>;
-        })}
+          </button>)}
+          {filtered.length === 0 && chatUserResults.length === 0 && !(normalizedChatSearch.length >= 2 && (chatUserSearch.isLoading || chatUserSearch.isError)) && <div className="sidebar-empty">
+            <div className="empty-mark"><MessageCircle size={19}/></div>
+            <b>{search ? 'Ничего не найдено' : 'Пока здесь тихо'}</b>
+            <p>{search ? 'Попробуйте другое имя или никнейм.' : 'Найдите человека по имени пользователя, чтобы начать личную переписку.'}</p>
+            {!search && <button className="text-action" onClick={() => setNewChat(true)} data-testid="button-start-first-chat">Найти человека <ArrowLeft size={14}/></button>}
+          </div>}
+        </>}
       </div>
     </aside>
     <section className="chat-stage">
