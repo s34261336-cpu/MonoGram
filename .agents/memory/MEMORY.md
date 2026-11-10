@@ -1,6 +1,6 @@
 - [Replit GitHub proxy](replit-github-proxy.md) — `github.replit.internal` may be the normal proxied remote for a GitHub repo.
 - [Русский интерфейс](russian-ui.md) — бренд MonoGram; весь пользовательский интерфейс на русском.
-- [Liquid Glass MonoGram](telegram-glass.md) — полупрозрачные поверхности, синие акценты и светлая/тёмная темы по настройке устройства.
+- [Liquid Glass MonoGram](telegram-glass.md) — сохранять текущий стиль, не менять внешний вид при функциональных исправлениях без отдельного запроса.
 - [Демо-код входа](demo-code-auth.md) — сохранять вход по коду на экране, не добавляя SMS или отдельную службу отправки без запроса.
 - [Ограничения Git в Replit](git-write-guard.md) — для разрешённых пользователем операций записи в Git может потребоваться `DANGEROUSLY_ALLOW_GIT=1`.
 - [Зависшие процессы workflows](workflow-stale-listeners.md) — при `EADDRINUSE` старый процесс артефакта может всё ещё обслуживать запросы, хотя workflow помечен как failed.

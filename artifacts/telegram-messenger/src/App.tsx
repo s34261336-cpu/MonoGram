@@ -395,7 +395,12 @@ function ChatWorkspace() {
   const messageAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const searchUsers = useUserSearch(username.replace(/^@/, ''), user?.id || '');
-  const filtered = useMemo(() => chats.filter(c => `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru'))), [chats, search]);
+  const normalizedChatSearch = search.trim().toLocaleLowerCase('ru').replace(/^@+/, '');
+  const filtered = useMemo(() => chats.filter(c => (
+    `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`
+      .toLocaleLowerCase('ru')
+      .includes(normalizedChatSearch)
+  )), [chats, normalizedChatSearch]);
   const unreadChatsCount = chats.filter(chat => unreadCountFor(chat) > 0).length;
   useEffect(() => { setDraft(''); setError(''); setPendingImage(null); }, [id]);
   useEffect(() => {
