@@ -107,7 +107,7 @@ export const RequestMessengerUploadUrlBody = zod.object({
   "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
 })
 
-export const requestMessengerUploadUrlResponseObjectPathRegExp = new RegExp('^/objects/uploads/[0-9a-f-]+/[0-9a-f-]+$');
+export const requestMessengerUploadUrlResponseObjectPathRegExp = new RegExp('^/supabase/uploads/[0-9a-f-]+/[0-9a-f-]+$');
 
 
 export const RequestMessengerUploadUrlResponse = zod.object({

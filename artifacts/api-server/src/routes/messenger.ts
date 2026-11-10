@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type RequestHandler } from 'express';
+import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { RequestMessengerUploadUrlBody, RequestMessengerUploadUrlResponse } from '@workspace/api-zod';
 import { requireDemoSession } from '../lib/demo-session';
@@ -18,6 +19,8 @@ const profileFields = 'id, username, display_name, bio, avatar_url';
 const imageMessagePrefix = 'MONOGRAM_IMAGE_V1:';
 const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const maxImageBytes = 10 * 1024 * 1024;
+const messageImagesBucket = 'monogram-message-images';
+const supabaseImagePathPrefix = '/supabase/uploads/';
 const objectStorageService = new ObjectStorageService();
 
 function apiError(message: string, status = 400) {
@@ -53,6 +56,23 @@ function decodeMessageContent(value: string) {
 
 function imageUrlFor(messageId: string, imagePath: string | null) {
   return imagePath ? `/api/messenger/messages/${encodeURIComponent(messageId)}/image` : null;
+}
+
+async function getSupabaseMessageImage(path: string) {
+  const { data, error } = await supabaseAdmin.storage.from(messageImagesBucket).download(path);
+  if (error) {
+    const statusCode = 'statusCode' in error ? Number(error.statusCode) : 0;
+    if (statusCode === 404) throw apiError('Фото не найдено.', 404);
+    throw error;
+  }
+  if (!data) throw apiError('Фото не найдено.', 404);
+  return data;
+}
+
+function validateSupabaseMessageImage(image: Blob, status: number) {
+  if (!allowedImageTypes.has(image.type.toLowerCase()) || image.size > maxImageBytes) {
+    throw apiError('Фото должно быть JPG, PNG или WebP размером до 10 МБ.', status);
+  }
 }
 
 function handleRoute(fn: (req: Request, res: Response) => Promise<void>): RequestHandler {
@@ -94,8 +114,14 @@ router.post('/uploads/request-url', handleRoute(async (req, res) => {
   const parsed = RequestMessengerUploadUrlBody.safeParse(req.body);
   if (!parsed.success) throw apiError('Выберите фото JPG, PNG или WebP размером до 10 МБ.');
   const ownerId = userId(req);
-  const uploadURL = await objectStorageService.getObjectEntityUploadURL(ownerId);
-  const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+  const storagePath = `${ownerId}/${randomUUID()}`;
+  const { data, error } = await supabaseAdmin.storage
+    .from(messageImagesBucket)
+    .createSignedUploadUrl(storagePath);
+  checkError(error);
+  if (!data?.signedUrl) throw new Error('Не удалось создать ссылку для загрузки фото.');
+  const uploadURL = data.signedUrl;
+  const objectPath = `${supabaseImagePathPrefix}${storagePath}`;
   res.json(RequestMessengerUploadUrlResponse.parse({ uploadURL, objectPath }));
 }));
 
@@ -282,6 +308,18 @@ router.get('/messages/:messageId/image', handleRoute(async (req, res) => {
   if (!data || !(await isMember(data.conversation_id, id))) throw apiError('Фото не найдено.', 404);
 
   const { imagePath } = decodeMessageContent(data.content);
+  if (imagePath?.startsWith(supabaseImagePathPrefix)) {
+    const storagePath = imagePath.slice(supabaseImagePathPrefix.length);
+    const image = await getSupabaseMessageImage(storagePath);
+    validateSupabaseMessageImage(image, 404);
+    res.status(200);
+    res.setHeader('Content-Type', image.type);
+    res.setHeader('Content-Length', String(image.size));
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(Buffer.from(await image.arrayBuffer()));
+    return;
+  }
   if (!imagePath || !imagePath.startsWith('/objects/uploads/')) throw apiError('Фото не найдено.', 404);
   let objectFile;
   try {
@@ -317,22 +355,34 @@ router.post('/messages', handleRoute(async (req, res) => {
   if (!(await isMember(conversationId, id))) throw apiError('Переписка не найдена.', 404);
   let storedContent = content;
   if (imagePath) {
-    const ownerPrefix = `/objects/uploads/${id}/`;
-    const objectId = imagePath.startsWith(ownerPrefix) ? imagePath.slice(ownerPrefix.length) : '';
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectId)) {
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const supabaseOwnerPrefix = `${supabaseImagePathPrefix}${id}/`;
+    const supabaseObjectId = imagePath.startsWith(supabaseOwnerPrefix)
+      ? imagePath.slice(supabaseOwnerPrefix.length)
+      : '';
+    const legacyOwnerPrefix = `/objects/uploads/${id}/`;
+    const legacyObjectId = imagePath.startsWith(legacyOwnerPrefix)
+      ? imagePath.slice(legacyOwnerPrefix.length)
+      : '';
+
+    if (uuidPattern.test(supabaseObjectId)) {
+      const image = await getSupabaseMessageImage(`${id}/${supabaseObjectId}`);
+      validateSupabaseMessageImage(image, 400);
+    } else if (uuidPattern.test(legacyObjectId)) {
+      let imageFile;
+      try {
+        imageFile = await objectStorageService.getObjectEntityFile(imagePath);
+      } catch (error) {
+        if (error instanceof ObjectNotFoundError) throw apiError('Фото не найдено.', 400);
+        throw error;
+      }
+      const [metadata] = await imageFile.getMetadata();
+      const imageType = typeof metadata.contentType === 'string' ? metadata.contentType : '';
+      if (!allowedImageTypes.has(imageType) || Number(metadata.size) > maxImageBytes) {
+        throw apiError('Фото должно быть JPG, PNG или WebP размером до 10 МБ.', 400);
+      }
+    } else {
       throw apiError('Фото не найдено.', 400);
-    }
-    let imageFile;
-    try {
-      imageFile = await objectStorageService.getObjectEntityFile(imagePath);
-    } catch (error) {
-      if (error instanceof ObjectNotFoundError) throw apiError('Фото не найдено.', 400);
-      throw error;
-    }
-    const [metadata] = await imageFile.getMetadata();
-    const imageType = typeof metadata.contentType === 'string' ? metadata.contentType : '';
-    if (!allowedImageTypes.has(imageType) || Number(metadata.size) > maxImageBytes) {
-      throw apiError('Фото должно быть JPG, PNG или WebP размером до 10 МБ.', 400);
     }
     storedContent = `${imageMessagePrefix}${JSON.stringify({ path: imagePath, caption: content })}`;
     if (storedContent.length > 4000) throw apiError('Подпись к фото слишком длинная.', 400);

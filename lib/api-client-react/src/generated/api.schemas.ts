@@ -101,7 +101,7 @@ export interface RequestUploadUrlBody {
 
 export interface RequestUploadUrlResponse {
   uploadURL: string;
-  /** @pattern ^/objects/uploads/[0-9a-f-]+/[0-9a-f-]+$ */
+  /** @pattern ^/supabase/uploads/[0-9a-f-]+/[0-9a-f-]+$ */
   objectPath: string;
 }
 

@@ -1,4 +1,17 @@
 -- Monogram data model. This migration is additive and safe to re-run.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'monogram-message-images',
+  'monogram-message-images',
+  false,
+  10485760,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = false,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text not null unique,
