@@ -31,6 +31,10 @@ function checkError(error: { message?: string; code?: string } | null) {
   if (error) throw apiError(error.message || 'Не удалось выполнить запрос.');
 }
 
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
 function toProfile(row: ProfileRow) {
   return {
     id: row.id,
@@ -158,20 +162,58 @@ router.patch('/profile', handleRoute(async (req, res) => {
 
 router.get('/search', handleRoute(async (req, res) => {
   const id = userId(req);
-  const query = String(req.query.term || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  const query = String(req.query.term || '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/^@+/, '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 80)
+    .toLocaleLowerCase('ru');
   if (query.length < 2) {
     res.json([]);
     return;
   }
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select(profileFields)
-    .ilike('username', `${query}%`)
-    .neq('id', id)
-    .order('username')
-    .limit(12);
-  checkError(error);
-  res.json((data ?? []).map(row => toProfile(row as ProfileRow)));
+  const usernameQuery = query.replace(/[^a-z0-9_]/g, '');
+  const searches = [];
+  if (usernameQuery.length >= 2) {
+    searches.push(
+      supabaseAdmin.from('profiles')
+        .select(profileFields)
+        .neq('id', id)
+        .ilike('username', `%${escapeLikePattern(usernameQuery)}%`)
+        .limit(100),
+    );
+  }
+  searches.push(
+    supabaseAdmin.from('profiles')
+      .select(profileFields)
+      .neq('id', id)
+      .ilike('display_name', `%${escapeLikePattern(query)}%`)
+      .limit(100),
+  );
+
+  const responses = await Promise.all(searches);
+  const matches = new Map<string, ProfileRow>();
+  for (const response of responses) {
+    checkError(response.error);
+    for (const row of response.data ?? []) matches.set(row.id, row as ProfileRow);
+  }
+  const score = (row: ProfileRow) => {
+    const username = row.username.toLocaleLowerCase('ru');
+    const displayName = row.display_name.toLocaleLowerCase('ru');
+    if (username === query) return 0;
+    if (displayName === query) return 1;
+    if (username.startsWith(query)) return 2;
+    if (displayName.startsWith(query)) return 3;
+    if (username.includes(query)) return 4;
+    return 5;
+  };
+  const orderedMatches = [...matches.values()].sort((left, right) => (
+    score(left) - score(right)
+    || left.display_name.localeCompare(right.display_name, 'ru')
+    || left.username.localeCompare(right.username, 'ru')
+  ));
+  res.json(orderedMatches.slice(0, 100).map(row => toProfile(row)));
 }));
 
 router.get('/wallet', handleRoute(async (req, res) => {
