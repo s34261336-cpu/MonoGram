@@ -3038,3 +3038,210 @@ html, body, #root, .workspace, .workspace-main,
 .mine .message-bubble {
   background: #2b5278;
 }
+
+/* Settings home */
+.mono-settings-user {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 11px 0 17px;
+  text-align: center;
+}
+
+.mono-settings-avatar-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-bottom: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mono-settings-avatar-button > .avatar {
+  width: 88px;
+  height: 88px;
+  box-shadow: 0 5px 20px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.16);
+}
+
+.mono-settings-camera {
+  position: absolute;
+  right: -2px;
+  bottom: 0;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 2px solid #0e1621;
+  border-radius: 50%;
+  color: #fff;
+  background: #3390ec;
+}
+
+.mono-settings-user > b {
+  color: #eef4f8;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.mono-settings-user > span {
+  color: #91a0ad;
+  font-size: 13px;
+}
+
+.mono-settings-group {
+  overflow: hidden;
+  margin-top: 2px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 19px;
+  background: #17212b;
+  box-shadow: 0 8px 24px rgba(0,0,0,.13);
+}
+
+.mono-settings-brand-row {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,.075);
+  color: #e6edf3;
+  background: #17212b;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mono-settings-brand-row > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.mono-settings-brand-row b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mono-settings-brand-row small {
+  color: #91a0ad;
+  font-size: 11px;
+}
+
+.mono-settings-brand-row > svg {
+  flex: none;
+  color: #738391;
+}
+
+.mono-settings-brand-row > .mono-settings-icon {
+  border-radius: 10px;
+  background: linear-gradient(145deg,#50a8f0,#2681d4);
+}
+
+.mono-settings-brand-row:hover,
+.mono-settings-brand-row:active {
+  background: #1c2a37;
+}
+
+.mono-settings-group > .mono-settings-list,
+.mono-settings-money > .mono-settings-list {
+  margin: 0;
+  padding: 2px 13px;
+  border: 0;
+  border-radius: 0;
+  background: #17212b !important;
+  box-shadow: none;
+}
+
+.mono-settings-row--detailed {
+  min-height: 58px;
+  gap: 12px;
+  padding: 7px 2px;
+  border-bottom: 1px solid rgba(255,255,255,.075);
+}
+
+.mono-settings-row--detailed > span:nth-child(2) {
+  gap: 3px;
+}
+
+.mono-settings-row--detailed b {
+  color: #e8edf2;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mono-settings-row--detailed small {
+  color: #91a0ad;
+  font-size: 11px;
+}
+
+.mono-settings-row--detailed > .mono-settings-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: #fff;
+}
+
+.mono-settings-value {
+  flex: none;
+  color: #71b9f1;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mono-settings-money {
+  display: grid;
+  gap: 10px;
+  margin: 13px 0 24px;
+}
+
+.mono-settings-money-heading {
+  min-height: 58px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 19px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.13);
+}
+
+.mono-settings-money-heading .mono-settings-icon {
+  background: linear-gradient(145deg,#31a9e7,#217fc4);
+}
+
+.mono-settings-money > .mono-settings-list {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 19px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.13);
+}
+
+.mono-settings-notice {
+  width: min(100%, 520px);
+}
+
+.mono-settings-notice .primary-button {
+  width: 100%;
+  margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+  .mono-settings-user {
+    padding-top: 7px;
+  }
+
+  .mono-settings-avatar-button > .avatar {
+    width: 82px;
+    height: 82px;
+  }
+
+  .mono-settings-user > b {
+    font-size: 17px;
+  }
+
+  .mono-settings-row--detailed {
+    min-height: 56px;
+  }
+}

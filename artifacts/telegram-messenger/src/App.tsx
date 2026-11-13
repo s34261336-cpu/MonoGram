@@ -17,7 +17,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, ArrowRight, AtSign, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Copy, Crown, Hash, ImagePlus, LoaderCircle, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Bell, BriefcaseBusiness, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Copy, Crown, Database, Gift, Hash, ImagePlus, Languages, Laptop, LoaderCircle, LockKeyhole, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
@@ -1184,18 +1184,132 @@ function ContactsPage() {
 }
 
 function SettingsPage() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [, setPath] = useLocation();
+  const profileQuery = useProfile(user?.id || '');
+  const walletQuery = useWallet(user?.id || '');
+  const profile = profileQuery.data;
   const [error, setError] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notice, setNotice] = useState<{ title: string; detail: string } | null>(null);
   const normalizedSearch = searchTerm.trim().toLowerCase();
-  const matches = (value: string) => !normalizedSearch || value.toLowerCase().includes(normalizedSearch);
-  const hasVisibleRows = matches('Профиль Имя имя пользователя описание') ||
-    matches('Каналы Публикации и подписки') ||
-    matches('Звёзды MonoGram Баланс и история операций') ||
-    matches('Выйти из аккаунта Завершить текущий сеанс');
+  const matches = (value: string) => !normalizedSearch || value.toLocaleLowerCase('ru').includes(normalizedSearch);
+  type SettingsMenuRow = {
+    label: string;
+    description: string;
+    icon: typeof CircleUserRound;
+    color: string;
+    href?: string;
+    detail?: string;
+    value?: string;
+    testId: string;
+  };
+  const settingsRows: SettingsMenuRow[] = [
+    {
+      label: 'Аккаунт',
+      description: 'Имя, номер и имя пользователя',
+      icon: CircleUserRound,
+      color: '#3390ec',
+      href: '/profile/edit',
+      testId: 'settings-account',
+    },
+    {
+      label: 'Настройки чатов',
+      description: 'Оформление и поведение переписок',
+      icon: MessageCircle,
+      color: '#e6a02f',
+      detail: 'Настройки оформления и поведения чатов пока не подключены.',
+      testId: 'settings-chats',
+    },
+    {
+      label: 'Конфиденциальность',
+      description: 'Ваш профиль и личные данные',
+      icon: LockKeyhole,
+      color: '#32b56a',
+      detail: 'В MonoGram другим пользователям доступны только публичные данные профиля. Управление дополнительными настройками приватности пока не подключено.',
+      testId: 'settings-privacy',
+    },
+    {
+      label: 'Уведомления',
+      description: 'Сообщения и другие события',
+      icon: Bell,
+      color: '#df5361',
+      detail: 'Push-уведомления пока не поддерживаются этой версией MonoGram.',
+      testId: 'settings-notifications',
+    },
+    {
+      label: 'Данные и память',
+      description: 'Хранение данных приложения',
+      icon: Database,
+      color: '#477dff',
+      detail: 'Переписки и профиль хранятся в MonoGram. Управление кешем и загрузками пока не подключено.',
+      testId: 'settings-data',
+    },
+    {
+      label: 'Устройства',
+      description: 'Активный сеанс на этом устройстве',
+      icon: Laptop,
+      color: '#18a9c6',
+      detail: 'Вы вошли в MonoGram на этом устройстве. Управление списком активных устройств пока не подключено.',
+      testId: 'settings-devices',
+    },
+    {
+      label: 'Язык',
+      description: 'Язык интерфейса',
+      value: 'Русский',
+      icon: Languages,
+      color: '#a45ad8',
+      detail: 'Сейчас интерфейс MonoGram доступен на русском языке.',
+      testId: 'settings-language',
+    },
+  ];
+  const moneyRows: SettingsMenuRow[] = [
+    {
+      label: 'Telegram Premium',
+      description: 'Подписка и дополнительные возможности',
+      icon: Crown,
+      color: '#a45ad8',
+      detail: 'Подписки пока не подключены к MonoGram.',
+      testId: 'settings-premium',
+    },
+    {
+      label: 'Звёзды MonoGram',
+      description: 'Баланс и история операций',
+      value: walletQuery.data ? `${walletQuery.data.balance}` : undefined,
+      icon: Star,
+      color: '#e6a02f',
+      href: '/stars',
+      testId: 'settings-stars',
+    },
+    {
+      label: 'Заработанные GRAM',
+      description: 'Вознаграждения и начисления',
+      icon: Sparkles,
+      color: '#229dd1',
+      detail: 'Начисления GRAM пока не подключены к MonoGram.',
+      testId: 'settings-gram',
+    },
+    {
+      label: 'Telegram для бизнеса',
+      description: 'Каналы и публикации',
+      icon: BriefcaseBusiness,
+      color: '#df5361',
+      href: '/channels',
+      testId: 'settings-business',
+    },
+    {
+      label: 'Отправить подарок',
+      description: 'Подарки друзьям',
+      icon: Gift,
+      color: '#e67b35',
+      detail: 'Отправка подарков пока не подключена к MonoGram.',
+      testId: 'settings-gift',
+    },
+  ];
+  const visibleSettingsRows = settingsRows.filter((item) => matches(`${item.label} ${item.description} ${item.value || ''}`));
+  const visibleMoneyRows = moneyRows.filter((item) => matches(`${item.label} ${item.description} ${item.value || ''}`));
 
   async function logout() {
     setError('');
@@ -1204,6 +1318,25 @@ function SettingsPage() {
     } catch (cause) {
       setError(userError(cause, 'Не удалось выйти из аккаунта.'));
     }
+  }
+
+  function renderRow(item: SettingsMenuRow) {
+    const Icon = item.icon;
+    const content = <>
+      <span className="mono-settings-icon" style={{ background: item.color }}><Icon size={19} /></span>
+      <span><b>{item.label}</b><small>{item.description}</small></span>
+      {'value' in item && item.value && <strong className="mono-settings-value">{item.value}</strong>}
+      <ArrowRight size={17} />
+    </>;
+    return item.href
+      ? <Link className="mono-settings-row mono-settings-row--detailed" href={item.href} key={item.testId} data-testid={item.testId}>{content}</Link>
+      : <button
+          className="mono-settings-row mono-settings-row--detailed"
+          key={item.testId}
+          onClick={() => setNotice({ title: item.label, detail: item.detail || 'Этот раздел пока недоступен.' })}
+          type="button"
+          data-testid={item.testId}
+        >{content}</button>;
   }
 
   return <div className="page-content mono-page">
@@ -1223,35 +1356,46 @@ function SettingsPage() {
         </div>}
       </div>
     </header>
+    <section className="mono-settings-user" aria-label="Профиль пользователя">
+      <button className="mono-settings-avatar-button" type="button" onClick={() => setPath('/profile')} aria-label="Открыть профиль">
+        <Avatar profile={profile} size="lg"/>
+        <span className="mono-settings-camera"><Camera size={16}/></span>
+      </button>
+      <b>{profile?.displayName || 'Пользователь'}</b>
+      <span>{formatPhone(user?.phone)} · @{profile?.username || 'username'}</span>
+    </section>
     {searchOpen && <label className="mono-settings-search">
       <Search size={17} aria-hidden="true"/>
       <input aria-label="Поиск по настройкам" placeholder="Поиск настроек" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} autoComplete="off"/>
       {searchTerm && <button type="button" aria-label="Очистить поиск" onClick={() => setSearchTerm('')}><X size={16}/></button>}
     </label>}
-    <section className="mono-settings-list" aria-label="Разделы приложения">
-      {matches('Профиль Имя имя пользователя описание') && <Link className="mono-settings-row" href="/profile">
-        <span className="mono-settings-icon"><UserRound size={19} /></span>
-        <span><b>Профиль</b><small>Имя, имя пользователя и описание</small></span>
-        <ArrowRight size={17} />
+    {visibleSettingsRows.length > 0 && <section className="mono-settings-group" aria-label="Настройки приложения">
+      <button className="mono-settings-brand-row" type="button" onClick={() => setNotice({ title: 'Настройки MonoGram', detail: 'Управляйте аккаунтом и настройками приложения в этом разделе.' })}>
+        <span className="mono-settings-icon"><MessageCircle size={19}/></span>
+        <span><b>Настройки MonoGram</b><small>Аккаунт и приложение</small></span>
+        <ArrowRight size={17}/>
+      </button>
+      <div className="mono-settings-list">{visibleSettingsRows.map(renderRow)}</div>
+    </section>}
+    {(visibleMoneyRows.length > 0) && <section className="mono-settings-money" aria-label="Деньги и сервисы">
+      {matches('Деньги баланс звёзды покупки') && <Link className="mono-settings-brand-row mono-settings-money-heading" href="/stars">
+        <span className="mono-settings-icon"><Wallet size={19}/></span>
+        <span><b>Деньги</b><small>Баланс MonoGram</small></span>
+        <ArrowRight size={17}/>
       </Link>}
-      {matches('Каналы Публикации и подписки') && <Link className="mono-settings-row" href="/channels">
-        <span className="mono-settings-icon"><Compass size={19} /></span>
-        <span><b>Каналы</b><small>Публикации и подписки</small></span>
-        <ArrowRight size={17} />
-      </Link>}
-      {matches('Звёзды MonoGram Баланс и история операций') && <Link className="mono-settings-row" href="/stars">
-        <span className="mono-settings-icon"><Star size={19} /></span>
-        <span><b>Звёзды MonoGram</b><small>Баланс и история операций</small></span>
-        <ArrowRight size={17} />
-      </Link>}
-      {matches('Выйти из аккаунта Завершить текущий сеанс') && <button className="mono-settings-row mono-settings-row--logout" onClick={() => { void logout(); }} type="button">
-        <span className="mono-settings-icon"><LogOut size={19} /></span>
-        <span><b>Выйти из аккаунта</b><small>Завершить текущий сеанс</small></span>
-        <ArrowRight size={17} />
-      </button>}
-      {!hasVisibleRows && <p className="mono-settings-empty">Ничего не найдено</p>}
-    </section>
+      <div className="mono-settings-list">{visibleMoneyRows.map(renderRow)}</div>
+    </section>}
+    {!visibleSettingsRows.length && !visibleMoneyRows.length && <p className="mono-settings-empty">Ничего не найдено</p>}
     {error && <p className="mono-contact-error" role="alert">{error}</p>}
+    {notice && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setNotice(null); }}>
+      <section className="dialog glass-card mono-settings-notice" role="dialog" aria-modal="true" aria-labelledby="mono-settings-notice-title">
+        <button className="dialog-close" type="button" onClick={() => setNotice(null)} aria-label="Закрыть"><X size={18}/></button>
+        <span className="overline">MONOGRAM</span>
+        <h2 id="mono-settings-notice-title">{notice.title}</h2>
+        <p>{notice.detail}</p>
+        <Button type="button" onClick={() => setNotice(null)}>Понятно</Button>
+      </section>
+    </div>}
   </div>;
 }
 
