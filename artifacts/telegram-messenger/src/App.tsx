@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, usePosts, useProfile, useSaveProfile, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
 import { usePresence } from '@/hooks/use-presence';
 import { useChatReadState } from '@/hooks/use-chat-read-state';
+import { useUserPreferences } from '@/hooks/use-user-preferences';
 import { uploadMessagePhoto, type Channel, type ChannelPost, type Conversation, type DirectMessage, type Profile } from '@/lib/messenger';
 import { apiBlobRequest } from '@/lib/api';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -315,10 +316,11 @@ function AuthScreen() {
   </main>;
 }
 
-function Navigation({ profile, hidden = false, unreadChatsCount = 0 }: {
+function Navigation({ profile, hidden = false, unreadChatsCount = 0, showUnreadBadge = true }: {
   profile?: Pick<Profile, 'id' | 'displayName' | 'avatarUrl'>;
   hidden?: boolean;
   unreadChatsCount?: number;
+  showUnreadBadge?: boolean;
 }) {
   const [path] = useLocation();
   const links = [
@@ -332,7 +334,7 @@ function Navigation({ profile, hidden = false, unreadChatsCount = 0 }: {
       const active = href === '/'
         ? path === '/' || path.startsWith('/chat/')
         : href === '/settings'
-          ? path === '/settings' || path.startsWith('/channels') || path === '/stars'
+          ? path === '/settings' || path.startsWith('/settings/') || path.startsWith('/channels') || path === '/stars'
           : path === href;
       return <Link
         key={href}
@@ -343,7 +345,7 @@ function Navigation({ profile, hidden = false, unreadChatsCount = 0 }: {
       >
         <span className="mono-tab__icon">
           {href === '/profile' ? <Avatar profile={profile} size="sm" /> : <Icon size={26} strokeWidth={2.1} />}
-          {href === '/' && unreadChatsCount > 0 && <span className="mono-tab__badge" aria-label={`${unreadChatsCount} непрочитанных чатов`}>
+          {href === '/' && showUnreadBadge && unreadChatsCount > 0 && <span className="mono-tab__badge" aria-label={`${unreadChatsCount} непрочитанных чатов`}>
             {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
           </span>}
         </span>
@@ -355,15 +357,47 @@ function Navigation({ profile, hidden = false, unreadChatsCount = 0 }: {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [path] = useLocation();
+  const [path, setPath] = useLocation();
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const profileQuery = useProfile(user?.id || '');
+  const chatsQuery = useChats(user?.id || '');
+  const { preferences } = useUserPreferences(user?.id || '');
+  const lastMessagesRef = useRef<{ userId: string; ids: Map<string, string> } | null>(null);
   const profile = profileQuery.data;
   const inConversation = path.startsWith('/chat/');
+  useEffect(() => {
+    if (!user?.id || !chatsQuery.data) {
+      lastMessagesRef.current = null;
+      return;
+    }
+    const currentIds = new Map(chatsQuery.data
+      .filter(chat => chat.lastMessage)
+      .map(chat => [chat.id, chat.lastMessage!.id]));
+    const previous = lastMessagesRef.current;
+    lastMessagesRef.current = { userId: user.id, ids: currentIds };
+    if (!previous || previous.userId !== user.id || !preferences.desktopNotifications) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    for (const chat of chatsQuery.data) {
+      const message = chat.lastMessage;
+      if (!message || message.authorId === user.id || previous.ids.get(chat.id) === message.id) continue;
+      const chatIsOpen = path === `/chat/${encodeURIComponent(chat.id)}`;
+      if (chatIsOpen && !document.hidden) continue;
+      if (!document.hidden && document.hasFocus()) continue;
+      const body = preferences.showNotificationText
+        ? message.content || (message.imageUrl ? 'Отправил(а) фото' : 'Новое сообщение')
+        : 'Новое сообщение';
+      const notification = new Notification(chat.person.displayName, { body, tag: `monogram-chat-${chat.id}` });
+      notification.onclick = () => {
+        window.focus();
+        setPath(`/chat/${encodeURIComponent(chat.id)}`);
+        notification.close();
+      };
+    }
+  }, [chatsQuery.data, path, preferences.desktopNotifications, preferences.showNotificationText, setPath, user?.id]);
   return <UnreadChatsCountContext.Provider value={setUnreadChatsCount}>
     <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`}>
       <div className="workspace-main">{children}</div>
-      <Navigation profile={profile} hidden={inConversation || path === '/profile/edit' || path === '/profile/username'} unreadChatsCount={unreadChatsCount} />
+      <Navigation profile={profile} hidden={inConversation || path === '/profile/edit' || path === '/profile/username'} unreadChatsCount={unreadChatsCount} showUnreadBadge={preferences.showUnreadBadge} />
     </div>
   </UnreadChatsCountContext.Provider>;
 }
@@ -381,7 +415,8 @@ function ChatWorkspace() {
   const chatsQuery = useChats(user?.id || '');
   const messagesQuery = useMessages(id, user?.id || '');
   const profileQuery = useProfile(user?.id || '');
-  const presence = usePresence(user?.id);
+  const { preferences } = useUserPreferences(user?.id || '');
+  const presence = usePresence(user?.id, preferences.showOnlineStatus);
   const chats = chatsQuery.data || [];
   const current = chats.find(c => c.id === id);
   const sendMessage = useSendMessage(user?.id || '');
@@ -533,7 +568,11 @@ function ChatWorkspace() {
                     {isOwnMessage && (isRead
                       ? <CheckCheck size={16} className="row-read-check" aria-label="Прочитано" />
                       : <Check size={14} className="row-sent-check" aria-label="Отправлено" />)}
-                    <span className="row-preview-text">{lastMessage ? `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.content || (lastMessage.imageUrl ? 'Фото' : '')}` : 'Сообщений пока нет'}</span>
+                    <span className="row-preview-text">{lastMessage
+                      ? preferences.showMessagePreviews
+                        ? `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.content || (lastMessage.imageUrl ? 'Фото' : '')}`
+                        : `${isOwnMessage ? 'Вы: ' : ''}${lastMessage.imageUrl ? 'Новое фото' : 'Новое сообщение'}`
+                      : 'Сообщений пока нет'}</span>
                   </span>
                   {unreadCount > 0 && <span className="conversation-unread" aria-label={`${unreadCount} непрочитанных`}>
                     {unreadCount > 99 ? '99+' : unreadCount}
@@ -583,8 +622,8 @@ function ChatWorkspace() {
            <div className="composer-main">
              <input ref={imageInputRef} className="composer-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectImage} aria-label="Выбрать фото"/>
              <button className="composer-attach" type="button" aria-label="Прикрепить фото" title="Прикрепить фото" onClick={() => imageInputRef.current?.click()} disabled={sendMessage.isPending || uploadingImage} data-testid="button-attach-photo"><ImagePlus size={21}/></button>
-             <textarea aria-label="Текст сообщения" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder={pendingImage ? 'Подпись к фото…' : 'Напишите сообщение…'} maxLength={4000} rows={1} data-testid="input-message" />
-             <span className="composer-count">{draft.length ? `${draft.length}/4000` : 'Ввод — отправить'}</span>
+              <textarea aria-label="Текст сообщения" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (preferences.sendMessageOnEnter && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder={pendingImage ? 'Подпись к фото…' : 'Напишите сообщение…'} maxLength={4000} rows={1} data-testid="input-message" />
+              <span className="composer-count">{draft.length ? `${draft.length}/4000` : preferences.sendMessageOnEnter ? 'Ввод — отправить' : 'Ввод — новая строка'}</span>
              <button className="send-circle" type="submit" disabled={(!draft.trim() && !pendingImage) || sendMessage.isPending || uploadingImage} aria-label="Отправить сообщение" data-testid="button-send-message">{sendMessage.isPending || uploadingImage ? <LoaderCircle className="spin" size={17}/> : <Send size={17}/>}</button>
            </div>
          </form>
@@ -1183,18 +1222,77 @@ function ContactsPage() {
   </div>;
 }
 
+function SettingsSwitch({ label, description, checked, onChange, disabled = false, testId }: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  testId: string;
+}) {
+  return <div className={`mono-preference-row ${disabled ? 'mono-preference-row--disabled' : ''}`}>
+    <span><b>{label}</b><small>{description}</small></span>
+    <button
+      className={`mono-preference-switch ${checked ? 'is-on' : ''}`}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      data-testid={testId}
+    ><i/></button>
+  </div>;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} Б`;
+  return `${(bytes / 1024).toFixed(1)} КБ`;
+}
+
+function currentDeviceLabel() {
+  if (typeof navigator === 'undefined') return 'Текущее устройство';
+  const ua = navigator.userAgent;
+  const platform = /Android/i.test(ua) ? 'Android'
+    : /iPhone|iPad|iPod/i.test(ua) ? 'iPhone или iPad'
+      : /Windows/i.test(ua) ? 'Windows'
+        : /Mac OS/i.test(ua) ? 'macOS'
+          : /Linux/i.test(ua) ? 'Linux' : 'Устройство';
+  const browser = /Edg\//i.test(ua) ? 'Microsoft Edge'
+    : /Firefox\//i.test(ua) ? 'Firefox'
+      : /Chrome\//i.test(ua) && !/Edg\//i.test(ua) ? 'Chrome'
+        : /Safari\//i.test(ua) && !/Chrome\//i.test(ua) ? 'Safari' : 'браузер';
+  return `${platform} · ${browser}`;
+}
+
+function localPreferenceBytes(userId: string) {
+  if (!userId || typeof window === 'undefined') return null;
+  try {
+    const values = [
+      window.localStorage.getItem(`monogram:user-preferences:${userId}`) || '',
+      window.localStorage.getItem(`monogram:chat-read:${userId}`) || '',
+    ];
+    return values.reduce((sum, value) => sum + new Blob([value]).size, 0);
+  } catch {
+    return null;
+  }
+}
+
 function SettingsPage() {
   const { signOut, user } = useAuth();
-  const [, setPath] = useLocation();
+  const [path, setPath] = useLocation();
   const profileQuery = useProfile(user?.id || '');
   const walletQuery = useWallet(user?.id || '');
   const profile = profileQuery.data;
+  const { preferences, updatePreference } = useUserPreferences(user?.id || '');
   const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [notice, setNotice] = useState<{ title: string; detail: string } | null>(null);
-  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const [confirmCacheClear, setConfirmCacheClear] = useState(false);
+  const section = path.startsWith('/settings/') ? path.slice('/settings/'.length).split('/')[0] : '';
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase('ru');
   const matches = (value: string) => !normalizedSearch || value.toLocaleLowerCase('ru').includes(normalizedSearch);
   type SettingsMenuRow = {
     label: string;
@@ -1202,114 +1300,28 @@ function SettingsPage() {
     icon: typeof CircleUserRound;
     color: string;
     href?: string;
-    detail?: string;
+    section?: string;
     value?: string;
     testId: string;
   };
   const settingsRows: SettingsMenuRow[] = [
-    {
-      label: 'Аккаунт',
-      description: 'Имя, номер и имя пользователя',
-      icon: CircleUserRound,
-      color: '#3390ec',
-      href: '/profile/edit',
-      testId: 'settings-account',
-    },
-    {
-      label: 'Настройки чатов',
-      description: 'Оформление и поведение переписок',
-      icon: MessageCircle,
-      color: '#e6a02f',
-      detail: 'Настройки оформления и поведения чатов пока не подключены.',
-      testId: 'settings-chats',
-    },
-    {
-      label: 'Конфиденциальность',
-      description: 'Ваш профиль и личные данные',
-      icon: LockKeyhole,
-      color: '#32b56a',
-      detail: 'В MonoGram другим пользователям доступны только публичные данные профиля. Управление дополнительными настройками приватности пока не подключено.',
-      testId: 'settings-privacy',
-    },
-    {
-      label: 'Уведомления',
-      description: 'Сообщения и другие события',
-      icon: Bell,
-      color: '#df5361',
-      detail: 'Push-уведомления пока не поддерживаются этой версией MonoGram.',
-      testId: 'settings-notifications',
-    },
-    {
-      label: 'Данные и память',
-      description: 'Хранение данных приложения',
-      icon: Database,
-      color: '#477dff',
-      detail: 'Переписки и профиль хранятся в MonoGram. Управление кешем и загрузками пока не подключено.',
-      testId: 'settings-data',
-    },
-    {
-      label: 'Устройства',
-      description: 'Активный сеанс на этом устройстве',
-      icon: Laptop,
-      color: '#18a9c6',
-      detail: 'Вы вошли в MonoGram на этом устройстве. Управление списком активных устройств пока не подключено.',
-      testId: 'settings-devices',
-    },
-    {
-      label: 'Язык',
-      description: 'Язык интерфейса',
-      value: 'Русский',
-      icon: Languages,
-      color: '#a45ad8',
-      detail: 'Сейчас интерфейс MonoGram доступен на русском языке.',
-      testId: 'settings-language',
-    },
+    { label: 'Аккаунт', description: 'Имя, номер и имя пользователя', icon: CircleUserRound, color: '#3390ec', href: '/profile/edit', testId: 'settings-account' },
+    { label: 'Настройки чатов', description: 'Предпросмотр и отправка сообщений', icon: MessageCircle, color: '#e6a02f', section: 'chats', testId: 'settings-chats' },
+    { label: 'Конфиденциальность', description: 'Статус «в сети»', icon: LockKeyhole, color: '#32b56a', section: 'privacy', testId: 'settings-privacy' },
+    { label: 'Уведомления', description: 'Уведомления о новых сообщениях', icon: Bell, color: '#df5361', section: 'notifications', testId: 'settings-notifications' },
+    { label: 'Данные и память', description: 'Кеш приложения и локальные данные', icon: Database, color: '#477dff', section: 'data', testId: 'settings-data' },
+    { label: 'Устройства', description: 'Активный сеанс на этом устройстве', icon: Laptop, color: '#18a9c6', section: 'devices', testId: 'settings-devices' },
+    { label: 'Язык', description: 'Язык интерфейса', icon: Languages, color: '#a45ad8', section: 'language', value: 'Русский', testId: 'settings-language' },
   ];
   const moneyRows: SettingsMenuRow[] = [
-    {
-      label: 'Telegram Premium',
-      description: 'Подписка и дополнительные возможности',
-      icon: Crown,
-      color: '#a45ad8',
-      detail: 'Подписки пока не подключены к MonoGram.',
-      testId: 'settings-premium',
-    },
-    {
-      label: 'Звёзды MonoGram',
-      description: 'Баланс и история операций',
-      value: walletQuery.data ? `${walletQuery.data.balance}` : undefined,
-      icon: Star,
-      color: '#e6a02f',
-      href: '/stars',
-      testId: 'settings-stars',
-    },
-    {
-      label: 'Заработанные GRAM',
-      description: 'Вознаграждения и начисления',
-      icon: Sparkles,
-      color: '#229dd1',
-      detail: 'Начисления GRAM пока не подключены к MonoGram.',
-      testId: 'settings-gram',
-    },
-    {
-      label: 'Telegram для бизнеса',
-      description: 'Каналы и публикации',
-      icon: BriefcaseBusiness,
-      color: '#df5361',
-      href: '/channels',
-      testId: 'settings-business',
-    },
-    {
-      label: 'Отправить подарок',
-      description: 'Подарки друзьям',
-      icon: Gift,
-      color: '#e67b35',
-      detail: 'Отправка подарков пока не подключена к MonoGram.',
-      testId: 'settings-gift',
-    },
+    { label: 'Telegram Premium', description: 'Экран подписки', icon: Crown, color: '#a45ad8', section: 'premium', testId: 'settings-premium' },
+    { label: 'Звёзды MonoGram', description: 'Баланс и история операций', icon: Star, color: '#e6a02f', href: '/stars', value: walletQuery.data ? `${walletQuery.data.balance}` : undefined, testId: 'settings-stars' },
+    { label: 'Заработанные GRAM', description: 'Экран начислений', icon: Sparkles, color: '#229dd1', section: 'gram', testId: 'settings-gram' },
+    { label: 'Telegram для бизнеса', description: 'Каналы и публикации', icon: BriefcaseBusiness, color: '#df5361', href: '/channels', testId: 'settings-business' },
+    { label: 'Отправить подарок', description: 'Экран подарков', icon: Gift, color: '#e67b35', section: 'gift', testId: 'settings-gift' },
   ];
-  const visibleSettingsRows = settingsRows.filter((item) => matches(`${item.label} ${item.description} ${item.value || ''}`));
-  const visibleMoneyRows = moneyRows.filter((item) => matches(`${item.label} ${item.description} ${item.value || ''}`));
+  const visibleSettingsRows = settingsRows.filter(item => matches(`${item.label} ${item.description} ${item.value || ''}`));
+  const visibleMoneyRows = moneyRows.filter(item => matches(`${item.label} ${item.description} ${item.value || ''}`));
 
   async function logout() {
     setError('');
@@ -1320,23 +1332,158 @@ function SettingsPage() {
     }
   }
 
+  async function toggleDesktopNotifications(enabled: boolean) {
+    setFeedback('');
+    if (!enabled) {
+      updatePreference('desktopNotifications', false);
+      setFeedback('Уведомления выключены.');
+      return;
+    }
+    if (!('Notification' in window) || !window.isSecureContext) {
+      setFeedback('Браузер не поддерживает уведомления на этой странице.');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      setFeedback('Разрешите уведомления MonoGram в настройках браузера.');
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      updatePreference('desktopNotifications', permission === 'granted');
+      setFeedback(permission === 'granted'
+        ? 'Уведомления включены. Новые сообщения появятся, когда MonoGram не на экране.'
+        : 'Браузер не выдал разрешение на уведомления.');
+    } catch {
+      setFeedback('Не удалось запросить разрешение. Проверьте настройки браузера.');
+    }
+  }
+
   function renderRow(item: SettingsMenuRow) {
     const Icon = item.icon;
     const content = <>
       <span className="mono-settings-icon" style={{ background: item.color }}><Icon size={19} /></span>
       <span><b>{item.label}</b><small>{item.description}</small></span>
-      {'value' in item && item.value && <strong className="mono-settings-value">{item.value}</strong>}
+      {item.value !== undefined && <strong className="mono-settings-value">{item.value}</strong>}
       <ArrowRight size={17} />
     </>;
-    return item.href
-      ? <Link className="mono-settings-row mono-settings-row--detailed" href={item.href} key={item.testId} data-testid={item.testId}>{content}</Link>
-      : <button
-          className="mono-settings-row mono-settings-row--detailed"
-          key={item.testId}
-          onClick={() => setNotice({ title: item.label, detail: item.detail || 'Этот раздел пока недоступен.' })}
-          type="button"
-          data-testid={item.testId}
-        >{content}</button>;
+    const href = item.href || (item.section ? `/settings/${item.section}` : '/settings');
+    return <Link className="mono-settings-row mono-settings-row--detailed" href={href} key={item.testId} data-testid={item.testId}>{content}</Link>;
+  }
+
+  const sectionTitles: Record<string, string> = {
+    monogram: 'Настройки MonoGram',
+    chats: 'Настройки чатов',
+    privacy: 'Конфиденциальность',
+    notifications: 'Уведомления',
+    data: 'Данные и память',
+    devices: 'Устройства',
+    language: 'Язык',
+    premium: 'Telegram Premium',
+    gram: 'Заработанные GRAM',
+    gift: 'Отправить подарок',
+  };
+
+  if (section) {
+    const notificationSupported = typeof window !== 'undefined' && 'Notification' in window && window.isSecureContext;
+    const notificationEnabled = notificationSupported && preferences.desktopNotifications && Notification.permission === 'granted';
+    const localBytes = localPreferenceBytes(user?.id || '');
+    const activeQueries = client.getQueryCache().getAll().length;
+    let content: React.ReactNode;
+    switch (section) {
+      case 'monogram':
+        content = <section className="mono-settings-panel">
+          <h2>Основные параметры</h2>
+          <SettingsSwitch label="Счётчик непрочитанных" description="Показывать число непрочитанных чатов на вкладке" checked={preferences.showUnreadBadge} onChange={value => updatePreference('showUnreadBadge', value)} testId="switch-unread-badge"/>
+        </section>;
+        break;
+      case 'chats':
+        content = <>
+          <section className="mono-settings-panel">
+            <h2>Список чатов</h2>
+            <SettingsSwitch label="Предпросмотр сообщений" description="Показывать текст последнего сообщения в списке чатов" checked={preferences.showMessagePreviews} onChange={value => updatePreference('showMessagePreviews', value)} testId="switch-message-previews"/>
+          </section>
+          <section className="mono-settings-panel">
+            <h2>Отправка сообщений</h2>
+            <SettingsSwitch label="Отправлять клавишей Enter" description="Enter отправляет сообщение, Shift+Enter создаёт новую строку" checked={preferences.sendMessageOnEnter} onChange={value => updatePreference('sendMessageOnEnter', value)} testId="switch-send-on-enter"/>
+          </section>
+        </>;
+        break;
+      case 'privacy':
+        content = <section className="mono-settings-panel">
+          <h2>Статус в сети</h2>
+          <SettingsSwitch label="Показывать статус «в сети»" description="Если выключить, MonoGram перестанет сообщать другим пользователям, что вы в сети" checked={preferences.showOnlineStatus} onChange={value => updatePreference('showOnlineStatus', value)} testId="switch-online-status"/>
+          <p className="mono-settings-explainer">Вы по-прежнему сможете видеть статус других пользователей.</p>
+        </section>;
+        break;
+      case 'notifications':
+        content = <>
+          <section className="mono-settings-panel">
+            <h2>Новые сообщения</h2>
+            <SettingsSwitch label="Уведомления на устройстве" description="Показывать уведомления, когда MonoGram открыт в фоне" checked={notificationEnabled} disabled={!notificationSupported && !preferences.desktopNotifications} onChange={value => void toggleDesktopNotifications(value)} testId="switch-desktop-notifications"/>
+            <SettingsSwitch label="Показывать текст сообщения" description="Иначе в уведомлении будет только надпись «Новое сообщение»" checked={preferences.showNotificationText} disabled={!notificationEnabled} onChange={value => updatePreference('showNotificationText', value)} testId="switch-notification-text"/>
+            {!notificationSupported && <p className="mono-settings-explainer">Для уведомлений нужен поддерживаемый браузер и защищённое соединение.</p>}
+            {feedback && <p className="mono-settings-feedback" role="status">{feedback}</p>}
+          </section>
+        </>;
+        break;
+      case 'data':
+        content = <section className="mono-settings-panel">
+          <h2>Память приложения</h2>
+          <div className="mono-settings-stat"><span>Локальные настройки и отметки прочтения</span><b>{localBytes === null ? 'Недоступно' : formatBytes(localBytes)}</b></div>
+          <div className="mono-settings-stat"><span>Данные в текущем кеше</span><b>{activeQueries} запросов</b></div>
+          <p className="mono-settings-explainer">Очистка удалит только временный кеш. Сообщения и профиль останутся на сервере; экран загрузит их снова при следующем открытии.</p>
+          {!confirmCacheClear
+            ? <button className="primary-button mono-settings-action" type="button" onClick={() => { setFeedback(''); setConfirmCacheClear(true); }} data-testid="button-clear-cache">Очистить временный кеш</button>
+            : <div className="mono-settings-confirm" role="group" aria-label="Подтверждение очистки кеша">
+              <span>Очистить загруженные данные приложения?</span>
+              <button className="primary-button" type="button" onClick={() => { void client.resetQueries().then(() => { setConfirmCacheClear(false); setFeedback('Временный кеш сброшен. Данные загрузятся заново.'); }); }} data-testid="button-confirm-clear-cache">Очистить</button>
+              <button className="outline-button" type="button" onClick={() => setConfirmCacheClear(false)}>Отмена</button>
+            </div>}
+          {feedback && <p className="mono-settings-feedback" role="status">{feedback}</p>}
+        </section>;
+        break;
+      case 'devices':
+        content = <section className="mono-settings-panel">
+          <h2>Активный сеанс</h2>
+          <div className="mono-device-card">
+            <span className="mono-settings-icon"><Laptop size={19}/></span>
+            <span><b>{currentDeviceLabel()}</b><small>Текущий сеанс · активен сейчас</small></span>
+          </div>
+          <p className="mono-settings-explainer">Список других устройств не ведётся. Выход ниже завершит сеанс только на этом устройстве.</p>
+          <button className="outline-button mono-settings-action" type="button" onClick={() => void logout()} data-testid="button-signout-device"><LogOut size={16}/> Выйти на этом устройстве</button>
+          {error && <p className="mono-contact-error" role="alert">{error}</p>}
+        </section>;
+        break;
+      case 'language':
+        content = <section className="mono-settings-panel">
+          <h2>Язык интерфейса</h2>
+          <div className="mono-language-option" aria-current="true">
+            <span><b>Русский</b><small>Текущий язык MonoGram</small></span><Check size={19}/>
+          </div>
+          <p className="mono-settings-explainer">Другие языки интерфейса пока не добавлены.</p>
+        </section>;
+        break;
+      case 'premium':
+        content = <section className="mono-settings-feature-screen"><span className="mono-settings-feature-icon"><Crown size={25}/></span><h2>Telegram Premium</h2><p>Экран Premium сохранён, как вы просили. Покупка подписки в MonoGram не подключена.</p></section>;
+        break;
+      case 'gram':
+        content = <section className="mono-settings-feature-screen"><span className="mono-settings-feature-icon"><Sparkles size={25}/></span><h2>Заработанные GRAM</h2><p>Здесь будет отображаться история начислений. Сейчас в MonoGram нет программы начисления GRAM.</p></section>;
+        break;
+      case 'gift':
+        content = <section className="mono-settings-feature-screen"><span className="mono-settings-feature-icon"><Gift size={25}/></span><h2>Подарки</h2><p>Экран подарков доступен. Каталог и отправка подарков в MonoGram пока не подключены.</p></section>;
+        break;
+      default:
+        content = <StateBlock title="Раздел не найден" detail="Вернитесь к списку настроек." action="К настройкам" onAction={() => setPath('/settings')}/>;
+    }
+
+    return <div className="page-content mono-page mono-settings-detail-page">
+      <header className="mono-screen-header mono-settings-detail-header">
+        <button type="button" onClick={() => setPath('/settings')} aria-label="Назад к настройкам"><ArrowLeft size={21}/></button>
+        <h1>{sectionTitles[section] || 'Настройки'}</h1>
+        <span aria-hidden="true"/>
+      </header>
+      <div className="mono-settings-detail-content">{content}</div>
+    </div>;
   }
 
   return <div className="page-content mono-page">
@@ -1344,12 +1491,8 @@ function SettingsPage() {
       <span className="mono-screen-header-spacer" aria-hidden="true"/>
       <h1>Настройки</h1>
       <div className="mono-screen-header-actions">
-        <button type="button" aria-label="Поиск настроек" title="Поиск настроек" aria-expanded={searchOpen} onClick={() => { setSearchOpen(value => !value); setMenuOpen(false); if (searchOpen) setSearchTerm(''); }} data-testid="button-settings-search">
-          <Search size={21}/>
-        </button>
-        <button type="button" aria-label="Дополнительные действия" title="Дополнительные действия" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value); setSearchOpen(false); }} data-testid="button-settings-menu">
-          <MoreVertical size={21}/>
-        </button>
+        <button type="button" aria-label="Поиск настроек" title="Поиск настроек" aria-expanded={searchOpen} onClick={() => { setSearchOpen(value => !value); setMenuOpen(false); if (searchOpen) setSearchTerm(''); }} data-testid="button-settings-search"><Search size={21}/></button>
+        <button type="button" aria-label="Дополнительные действия" title="Дополнительные действия" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value); setSearchOpen(false); }} data-testid="button-settings-menu"><MoreVertical size={21}/></button>
         {menuOpen && <div className="mono-screen-menu" role="menu">
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setPath('/profile'); }}>Профиль</button>
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void logout(); }}>Выйти из аккаунта</button>
@@ -1370,14 +1513,14 @@ function SettingsPage() {
       {searchTerm && <button type="button" aria-label="Очистить поиск" onClick={() => setSearchTerm('')}><X size={16}/></button>}
     </label>}
     {visibleSettingsRows.length > 0 && <section className="mono-settings-group" aria-label="Настройки приложения">
-      <button className="mono-settings-brand-row" type="button" onClick={() => setNotice({ title: 'Настройки MonoGram', detail: 'Управляйте аккаунтом и настройками приложения в этом разделе.' })}>
+      <Link className="mono-settings-brand-row" href="/settings/monogram">
         <span className="mono-settings-icon"><MessageCircle size={19}/></span>
-        <span><b>Настройки MonoGram</b><small>Аккаунт и приложение</small></span>
+        <span><b>Настройки MonoGram</b><small>Основные параметры приложения</small></span>
         <ArrowRight size={17}/>
-      </button>
+      </Link>
       <div className="mono-settings-list">{visibleSettingsRows.map(renderRow)}</div>
     </section>}
-    {(visibleMoneyRows.length > 0) && <section className="mono-settings-money" aria-label="Деньги и сервисы">
+    {visibleMoneyRows.length > 0 && <section className="mono-settings-money" aria-label="Деньги и сервисы">
       {matches('Деньги баланс звёзды покупки') && <Link className="mono-settings-brand-row mono-settings-money-heading" href="/stars">
         <span className="mono-settings-icon"><Wallet size={19}/></span>
         <span><b>Деньги</b><small>Баланс MonoGram</small></span>
@@ -1387,15 +1530,6 @@ function SettingsPage() {
     </section>}
     {!visibleSettingsRows.length && !visibleMoneyRows.length && <p className="mono-settings-empty">Ничего не найдено</p>}
     {error && <p className="mono-contact-error" role="alert">{error}</p>}
-    {notice && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setNotice(null); }}>
-      <section className="dialog glass-card mono-settings-notice" role="dialog" aria-modal="true" aria-labelledby="mono-settings-notice-title">
-        <button className="dialog-close" type="button" onClick={() => setNotice(null)} aria-label="Закрыть"><X size={18}/></button>
-        <span className="overline">MONOGRAM</span>
-        <h2 id="mono-settings-notice-title">{notice.title}</h2>
-        <p>{notice.detail}</p>
-        <Button type="button" onClick={() => setNotice(null)}>Понятно</Button>
-      </section>
-    </div>}
   </div>;
 }
 
@@ -1408,6 +1542,7 @@ function AppRoutes() {
     <Route path="/chat/:conversationId" component={ChatWorkspace}/>
     <Route path="/contacts" component={ContactsPage}/>
     <Route path="/settings" component={SettingsPage}/>
+    <Route path="/settings/:section" component={SettingsPage}/>
     <Route path="/channels" component={ChannelsPage}/>
     <Route path="/channels/:channelId" component={ChannelPage}/>
     <Route path="/profile/edit" component={AccountEditPage}/>

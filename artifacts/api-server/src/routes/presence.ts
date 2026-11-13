@@ -16,12 +16,14 @@ function getOnlineIds() {
 router.use(requireDemoSession);
 
 router.post('/presence/heartbeat', (req, res) => {
-  if (req.demoIdentity) onlineUsers.set(req.demoIdentity.id, Date.now());
+  if (req.demoIdentity) {
+    if (req.body?.visible === false) onlineUsers.delete(req.demoIdentity.id);
+    else onlineUsers.set(req.demoIdentity.id, Date.now());
+  }
   res.json({ ok: true });
 });
 
 router.get('/presence', (req, res) => {
-  if (req.demoIdentity) onlineUsers.set(req.demoIdentity.id, Date.now());
   const onlineUserIds = getOnlineIds();
   res.json({ connected: true, onlineCount: onlineUserIds.length, onlineUserIds });
 });

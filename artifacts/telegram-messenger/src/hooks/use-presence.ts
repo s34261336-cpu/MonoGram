@@ -7,7 +7,7 @@ export type PresenceState = {
   onlineUserIds: string[];
 };
 
-export function usePresence(userId?: string | null): PresenceState {
+export function usePresence(userId?: string | null, enabled = true): PresenceState {
   const [state, setState] = useState<PresenceState>({
     connected: false,
     onlineCount: 0,
@@ -24,7 +24,10 @@ export function usePresence(userId?: string | null): PresenceState {
     let timer: ReturnType<typeof setInterval> | undefined;
     const syncPresence = async () => {
       try {
-        await apiRequest('/api/presence/heartbeat', { method: 'POST' });
+        await apiRequest('/api/presence/heartbeat', {
+          method: 'POST',
+          body: JSON.stringify({ visible: enabled }),
+        });
         const next = await apiRequest<PresenceState>('/api/presence');
         if (alive) setState(next);
       } catch {
@@ -38,7 +41,7 @@ export function usePresence(userId?: string | null): PresenceState {
       alive = false;
       if (timer) clearInterval(timer);
     };
-  }, [userId]);
+  }, [enabled, userId]);
 
   return state;
 }

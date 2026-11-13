@@ -3218,13 +3218,260 @@ html, body, #root, .workspace, .workspace-main,
   box-shadow: 0 8px 24px rgba(0,0,0,.13);
 }
 
-.mono-settings-notice {
-  width: min(100%, 520px);
+.mono-settings-detail-page {
+  padding-bottom: calc(36px + env(safe-area-inset-bottom));
 }
 
-.mono-settings-notice .primary-button {
+.mono-settings-detail-header {
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  margin-bottom: 14px;
+}
+
+.mono-settings-detail-header > button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #aab7c4;
+  background: transparent;
+}
+
+.mono-settings-detail-header > button:hover {
+  color: #f1f4f7;
+  background: rgba(255,255,255,.07);
+}
+
+.mono-settings-detail-content {
+  display: grid;
   width: 100%;
-  margin-top: 2px;
+  max-width: 640px;
+  gap: 12px;
+  margin: 0 auto;
+}
+
+.mono-settings-panel {
+  padding: 8px 17px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 19px;
+  background: #17212b;
+  box-shadow: 0 8px 24px rgba(0,0,0,.13);
+}
+
+.mono-settings-panel h2 {
+  margin: 8px 0 4px;
+  color: #8eacc2;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mono-preference-row {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid rgba(255,255,255,.075);
+}
+
+.mono-preference-row > span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.mono-preference-row b {
+  color: #e8edf2;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mono-preference-row small {
+  color: #91a0ad;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.mono-preference-switch {
+  position: relative;
+  width: 46px;
+  height: 27px;
+  flex: 0 0 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: #46535e;
+  transition: background .18s ease;
+}
+
+.mono-preference-switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.28);
+  transition: transform .18s ease;
+}
+
+.mono-preference-switch.is-on {
+  background: #3390ec;
+}
+
+.mono-preference-switch.is-on i {
+  transform: translateX(19px);
+}
+
+.mono-preference-switch:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.mono-preference-row--disabled {
+  opacity: .62;
+}
+
+.mono-settings-explainer,
+.mono-settings-feedback {
+  margin: 12px 0 8px;
+  color: #91a0ad;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mono-settings-feedback {
+  color: #7ed2a5;
+}
+
+.mono-settings-stat {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid rgba(255,255,255,.075);
+  color: #dce5ec;
+  font-size: 13px;
+}
+
+.mono-settings-stat b {
+  flex: none;
+  color: #72baf1;
+  font-size: 13px;
+}
+
+.mono-settings-action {
+  width: 100%;
+  margin: 12px 0 8px;
+}
+
+.mono-settings-confirm {
+  display: grid;
+  gap: 9px;
+  padding: 13px 0 7px;
+  color: #e8edf2;
+  font-size: 13px;
+}
+
+.mono-settings-confirm .primary-button,
+.mono-settings-confirm .outline-button {
+  width: 100%;
+}
+
+.mono-device-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255,255,255,.075);
+}
+
+.mono-device-card > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.mono-device-card b {
+  color: #e8edf2;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mono-device-card small {
+  color: #91a0ad;
+  font-size: 11px;
+}
+
+.mono-language-option {
+  display: flex;
+  width: 100%;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid rgba(255,255,255,.075);
+  color: #71b9f1;
+  background: transparent;
+  text-align: left;
+}
+
+.mono-language-option > span {
+  display: grid;
+  gap: 4px;
+}
+
+.mono-language-option b {
+  color: #e8edf2;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mono-language-option small {
+  color: #91a0ad;
+  font-size: 11px;
+}
+
+.mono-settings-feature-screen {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 36px 22px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 22px;
+  background: #17212b;
+  text-align: center;
+}
+
+.mono-settings-feature-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  margin-bottom: 5px;
+  border-radius: 18px;
+  color: #75bdf1;
+  background: rgba(51,144,236,.18);
+}
+
+.mono-settings-feature-screen h2 {
+  margin: 0;
+  color: #e8edf2;
+  font-size: 19px;
+}
+
+.mono-settings-feature-screen p {
+  max-width: 400px;
+  margin: 0;
+  color: #91a0ad;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 @media (max-width: 600px) {
@@ -3243,5 +3490,14 @@ html, body, #root, .workspace, .workspace-main,
 
   .mono-settings-row--detailed {
     min-height: 56px;
+  }
+
+  .mono-settings-detail-header {
+    margin-bottom: 10px;
+  }
+
+  .mono-settings-panel {
+    padding-right: 14px;
+    padding-left: 14px;
   }
 }
