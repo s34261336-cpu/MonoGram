@@ -7,7 +7,7 @@ import { usePresence } from '@/hooks/use-presence';
 import { useChatReadState } from '@/hooks/use-chat-read-state';
 import { useUserPreferences } from '@/hooks/use-user-preferences';
 import { uploadMessagePhoto, type Channel, type ChannelPost, type Conversation, type DirectMessage, type Profile } from '@/lib/messenger';
-import { apiBlobRequest } from '@/lib/api';
+import { apiBlobRequest, apiRequest } from '@/lib/api';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +27,10 @@ const client = new QueryClient({ defaultOptions: { queries: { staleTime: 12_000,
 const dateLabel = (value?: string) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: ru }) : '';
 const clock = (value?: string) => value ? format(new Date(value), 'HH:mm') : '';
 const initials = (name?: string) => Array.from((name || '?').trim())[0]?.toUpperCase() || '?';
+const canSearchUsers = (value: string) => value.length >= 2 || /^\d+$/.test(value);
+const profileIdentifier = (profile: Pick<Profile, 'username' | 'publicId'>) => (
+  profile.username ? `@${profile.username}` : `ID ${profile.publicId}`
+);
 function formatPhone(phone?: string) {
   const digits = (phone || '').replace(/\D/g, '');
   const normalized = digits.length === 10 ? `7${digits}` : digits;
@@ -72,6 +76,7 @@ const channelCountLabel = (count: number) => {
 const transactionLabel = (reason: string) => ({
   welcome_bonus: 'Приветственный бонус',
   channel_reaction: 'Отправка звёзд за публикацию',
+  admin_grant: 'Начисление от администратора',
 }[reason] || 'Операция со звёздами');
 const UnreadChatsCountContext = createContext<(count: number) => void>(() => {});
 
@@ -93,17 +98,6 @@ function userError(error: unknown, fallback: string, authMode?: 'request-code') 
   if (/[А-Яа-яЁё]/.test(message)) return message;
   if (status === 409) return fallback;
   return fallback;
-}
-
-function isNetworkFailure(error: unknown) {
-  const details = typeof error === 'object' && error !== null
-    ? error as { message?: unknown; status?: unknown }
-    : {};
-  const message = typeof details.message === 'string' ? details.message.toLowerCase() : '';
-  const status = typeof details.status === 'number' ? details.status : 0;
-  return /failed to fetch|network|fetch error|load failed/.test(message)
-    || status === 0
-    || (status >= 502 && status <= 504);
 }
 
 function Avatar({ profile, size = 'md' }: { profile?: Pick<Profile, 'id' | 'displayName' | 'avatarUrl'>; size?: 'sm' | 'md' | 'lg' }) {
@@ -148,6 +142,7 @@ function AuthScreen() {
   const { requestDemoCode, verifyDemoCode } = useAuth();
   const [phoneDigits, setPhoneDigits] = useState('');
   const [demoCode, setDemoCode] = useState('');
+  const [requiresAdminCode, setRequiresAdminCode] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [error, setError] = useState('');
@@ -172,24 +167,24 @@ function AuthScreen() {
     setError('');
     setBusy(true);
     try {
-      setDemoCode(await requestDemoCode(`+7${phoneDigits}`));
+      const result = await requestDemoCode(`+7${phoneDigits}`);
+      setDemoCode(result.demoCode || '');
+      setRequiresAdminCode(result.requiresAdminCode);
       setInputCode('');
       setCodeFeedback('idle');
       setStep('code');
     } catch (e) {
-      if (isNetworkFailure(e)) {
-        setError(userError(e, 'Не удалось подключиться. Проверьте интернет и попробуйте снова.', 'request-code'));
-      }
+      setError(userError(e, 'Не удалось запросить код. Попробуйте ещё раз.', 'request-code'));
     }
     finally { setBusy(false); }
   }
 
   async function confirmCode(event: FormEvent) {
     event.preventDefault();
-    if (inputCode.length !== 5) {
+    if (requiresAdminCode ? !inputCode : inputCode.length !== 5) {
       setCodeFeedback('error');
       setShakeKey(current => current + 1);
-      setError('Введите все пять цифр кода.');
+      setError(requiresAdminCode ? 'Введите код администратора.' : 'Введите все пять цифр кода.');
       return;
     }
     setError('');
@@ -254,19 +249,41 @@ function AuthScreen() {
           <Button className="mono-auth__submit" type="submit" disabled={busy || phoneDigits.length !== 10} data-testid="button-request-code">
             {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>Далее <ArrowRight size={17} /></>}
           </Button>
-          <p className="mono-auth__hint">На этом демо-этапе код появится на экране, SMS не отправляется.</p>
+          <p className="mono-auth__hint">Для обычного входа код появится на экране; SMS не отправляется.</p>
         </form> : <form className="mono-auth__form" onSubmit={confirmCode}>
-          <div className="mono-auth__demo-code" role="status" data-testid="demo-code">
+          {!requiresAdminCode && <div className="mono-auth__demo-code" role="status" data-testid="demo-code">
             <span>Ваш демо-код</span>
             <strong>{demoCode}</strong>
-          </div>
+          </div>}
           <div className="mono-auth__field">
-            <label htmlFor="input-demo-code">Код из пяти цифр</label>
-            <div
-              className="mono-auth__otp-frame"
-              data-feedback={codeFeedback}
-              data-shake={shakeKey % 2}
-            >
+            <label htmlFor={requiresAdminCode ? 'input-admin-code' : 'input-demo-code'}>
+              {requiresAdminCode ? 'Код администратора' : 'Код из пяти цифр'}
+            </label>
+            {requiresAdminCode
+              ? <div className="mono-auth__control">
+                <Shield size={17} aria-hidden="true" />
+                <input
+                  id="input-admin-code"
+                  type="password"
+                  autoComplete="current-password"
+                  aria-label="Код администратора"
+                  aria-invalid={codeFeedback === 'error'}
+                  maxLength={256}
+                  value={inputCode}
+                  disabled={busy || codeFeedback === 'success'}
+                  onChange={event => {
+                    setInputCode(event.target.value);
+                    if (codeFeedback === 'error') setCodeFeedback('idle');
+                    if (error) setError('');
+                  }}
+                  data-testid="input-admin-code"
+                />
+              </div>
+              : <div
+                className="mono-auth__otp-frame"
+                data-feedback={codeFeedback}
+                data-shake={shakeKey % 2}
+              >
               <InputOTP
                 id="input-demo-code"
                 maxLength={5}
@@ -297,16 +314,16 @@ function AuthScreen() {
                   ))}
                 </InputOTPGroup>
               </InputOTP>
-            </div>
+              </div>}
           </div>
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
           {codeFeedback === 'success' && <p className="mono-auth__success-message" role="status">Код подтверждён. Открываем чаты…</p>}
-          <Button className="mono-auth__submit" type="submit" disabled={busy || inputCode.length !== 5} data-testid="button-confirm-code">
+          <Button className="mono-auth__submit" type="submit" disabled={busy || (requiresAdminCode ? !inputCode : inputCode.length !== 5)} data-testid="button-confirm-code">
             {busy
               ? <><LoaderCircle className="spin" size={17} /> Проверяем</>
               : <>Подтвердить <Check size={17} /></>}
           </Button>
-          <button className="mono-auth__back" type="button" onClick={() => { setError(''); setStep('phone'); }} data-testid="button-edit-phone">
+          <button className="mono-auth__back" type="button" onClick={() => { setError(''); setStep('phone'); setRequiresAdminCode(false); }} data-testid="button-edit-phone">
             <ArrowLeft size={15} /> Изменить номер
           </button>
         </form>}
@@ -431,13 +448,14 @@ function ChatWorkspace() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const searchUsers = useUserSearch(username.replace(/^@/, ''), user?.id || '');
   const normalizedChatSearch = search.trim().toLocaleLowerCase('ru').replace(/^@+/, '');
+  const chatSearchReady = canSearchUsers(normalizedChatSearch);
   const chatUserSearch = useUserSearch(normalizedChatSearch, user?.id || '');
   const chatUserResults = useMemo(() => {
     const existingUserIds = new Set(chats.map(chat => chat.person.id));
     return (chatUserSearch.data || []).filter(person => !existingUserIds.has(person.id));
   }, [chats, chatUserSearch.data]);
   const filtered = useMemo(() => chats.filter(c => (
-    `${c.person.displayName} ${c.person.username} ${c.lastMessage?.content || ''}`
+    `${c.person.displayName} ${c.person.username || ''} ${c.person.publicId} ${c.lastMessage?.content || ''}`
       .toLocaleLowerCase('ru')
       .includes(normalizedChatSearch)
   )), [chats, normalizedChatSearch]);
@@ -581,13 +599,13 @@ function ChatWorkspace() {
               </span>
             </button>;
           })}
-          {normalizedChatSearch.length >= 2 && chatUserSearch.isLoading && filtered.length === 0 && <div className="list-skeleton">{[1,2].map(i => <div className="skeleton-chat" key={`search-${i}`}><i/><span/><b/></div>)}</div>}
-          {normalizedChatSearch.length >= 2 && chatUserSearch.isError && <StateBlock title="Поиск пользователей недоступен" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => { void chatUserSearch.refetch(); }} />}
+          {chatSearchReady && chatUserSearch.isLoading && filtered.length === 0 && <div className="list-skeleton">{[1,2].map(i => <div className="skeleton-chat" key={`search-${i}`}><i/><span/><b/></div>)}</div>}
+          {chatSearchReady && chatUserSearch.isError && <StateBlock title="Поиск пользователей недоступен" detail="Проверьте подключение и попробуйте снова." action="Повторить" onAction={() => { void chatUserSearch.refetch(); }} />}
           {chatUserResults.map(person => <button
             type="button"
             className="conversation-row"
             key={`user-${person.id}`}
-            onClick={() => void beginChat(person.username)}
+            onClick={() => void beginChat(person.username || person.publicId)}
             disabled={startConversation.isPending}
             data-testid={`chat-search-user-${person.id}`}
           >
@@ -595,14 +613,14 @@ function ChatWorkspace() {
             <span className="conversation-row-copy">
               <span className="row-title"><span className="row-name">{person.displayName}</span></span>
               <span className="row-bottom">
-                <span className="row-preview"><span className="row-preview-text">@{person.username} · Начать переписку</span></span>
+                <span className="row-preview"><span className="row-preview-text">{profileIdentifier(person)} · Начать переписку</span></span>
               </span>
             </span>
           </button>)}
-          {filtered.length === 0 && chatUserResults.length === 0 && !(normalizedChatSearch.length >= 2 && (chatUserSearch.isLoading || chatUserSearch.isError)) && <div className="sidebar-empty">
+          {filtered.length === 0 && chatUserResults.length === 0 && !(chatSearchReady && (chatUserSearch.isLoading || chatUserSearch.isError)) && <div className="sidebar-empty">
             <div className="empty-mark"><MessageCircle size={19}/></div>
             <b>{search ? 'Ничего не найдено' : 'Пока здесь тихо'}</b>
-            <p>{search ? 'Попробуйте другое имя или никнейм.' : 'Найдите человека по имени пользователя, чтобы начать личную переписку.'}</p>
+            <p>{search ? 'Попробуйте другое имя или числовой ID.' : 'Найдите человека по имени пользователя или ID, чтобы начать переписку.'}</p>
             {!search && <button className="text-action" onClick={() => setNewChat(true)} data-testid="button-start-first-chat">Найти человека <ArrowLeft size={14}/></button>}
           </div>}
         </>}
@@ -610,7 +628,7 @@ function ChatWorkspace() {
     </aside>
     <section className="chat-stage">
       {current ? <>
-         <header className="chat-topbar glass-surface"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={presence.onlineUserIds.includes(current.person.id) ? 'presence-online' : ''}>{presence.onlineUserIds.includes(current.person.id) ? 'В сети' : `@${current.person.username}`}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>@{current.person.username}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
+         <header className="chat-topbar glass-surface"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={presence.onlineUserIds.includes(current.person.id) ? 'presence-online' : ''}>{presence.onlineUserIds.includes(current.person.id) ? 'В сети' : profileIdentifier(current.person)}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>{profileIdentifier(current.person)}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
          <div className="message-area" ref={messageAreaRef}>
           {messagesQuery.isLoading ? <div className="message-skeleton"><i/><i/><i/></div> : messagesQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Переписка сохранена. Попробуйте ещё раз." action="Повторить" onAction={() => messagesQuery.refetch()} /> : messages.length === 0 ? <div className="chat-welcome"><span className="welcome-symbol"><MessageCircle size={23}/></span><span className="overline">ЛИЧНАЯ ПЕРЕПИСКА</span><h2>Поздоровайтесь с {current.person.displayName.split(' ')[0]}.</h2><p>Эту переписку видите только вы и собеседник.</p></div> : <div className="message-thread">{messages.map((message: DirectMessage) => {
             const mine = message.authorId === user?.id;
@@ -633,8 +651,8 @@ function ChatWorkspace() {
     <button className="chat-compose-fab" type="button" onClick={() => setNewChat(true)} aria-label="Написать сообщение" title="Новое сообщение" data-testid="button-new-chat">
       <PenLine size={22} />
     </button>
-     {newChat && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setNewChat(false); }}><section className="dialog glass-card"><button className="dialog-close" onClick={() => setNewChat(false)} aria-label="Закрыть"><X size={18}/></button><span className="overline">НАЧНИТЕ ЛИЧНУЮ ПЕРЕПИСКУ</span><h2>Найти по имени пользователя</h2><p>Введите точное имя пользователя латинскими буквами. Профиль останется закрытым, пока вы не напишете первым.</p><div className="username-input"><AtSign size={17}/><input autoFocus aria-label="Имя пользователя для поиска" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ''))} placeholder="имя пользователя" data-testid="input-find-username"/></div>
-      {username.length >= 2 && <div className="user-results">{searchUsers.isLoading ? <div className="result-hint">Ищем людей…</div> : searchUsers.isError ? <div className="result-hint">Сейчас поиск недоступен.</div> : searchUsers.data?.length ? searchUsers.data.map(person => <button key={person.id} className="user-result" onClick={() => void beginChat(person.username)} data-testid={`user-result-${person.id}`}><Avatar profile={person} size="sm"/><span><b>{person.displayName}</b><small>@{person.username}</small></span><ArrowLeft size={15}/></button>) : <div className="result-hint">Пользователей с таким именем нет.</div>}</div>}
+     {newChat && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setNewChat(false); }}><section className="dialog glass-card"><button className="dialog-close" onClick={() => setNewChat(false)} aria-label="Закрыть"><X size={18}/></button><span className="overline">НАЧНИТЕ ЛИЧНУЮ ПЕРЕПИСКУ</span><h2>Найти человека</h2><p>Введите имя пользователя или числовой ID. Профиль останется закрытым, пока вы не напишете первым.</p><div className="username-input"><Search size={17}/><input autoFocus aria-label="Имя пользователя или ID" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ''))} placeholder="имя пользователя или ID" data-testid="input-find-username"/></div>
+      {canSearchUsers(username) && <div className="user-results">{searchUsers.isLoading ? <div className="result-hint">Ищем людей…</div> : searchUsers.isError ? <div className="result-hint">Сейчас поиск недоступен.</div> : searchUsers.data?.length ? searchUsers.data.map(person => <button key={person.id} className="user-result" onClick={() => void beginChat(person.username || person.publicId)} data-testid={`user-result-${person.id}`}><Avatar profile={person} size="sm"/><span><b>{person.displayName}</b><small>{profileIdentifier(person)}</small></span><ArrowLeft size={15}/></button>) : <div className="result-hint">Пользователей с таким именем или ID нет.</div>}</div>}
       {startError && <p className="form-error" role="alert">{startError}</p>}
       <button className="primary-button full-button" onClick={() => void beginChat()} disabled={!username.trim() || startConversation.isPending} data-testid="button-start-conversation">{startConversation.isPending ? <LoaderCircle className="spin" size={16}/> : <MessageCircle size={16}/>} Начать переписку</button>
     </section></div>}
@@ -724,7 +742,7 @@ function ProfilePage() {
   const form = useForm<{username:string;avatarUrl:string}>({defaultValues:{username:'',avatarUrl:''}});
   const profile = query.data;
   const initialized = useRef('');
-  useEffect(()=>{if(profile && initialized.current !== profile.id){initialized.current=profile.id;form.reset({username:profile.username,avatarUrl:profile.avatarUrl||''});}},[profile,form]);
+  useEffect(()=>{if(profile && initialized.current !== profile.id){initialized.current=profile.id;form.reset({username:profile.username || '',avatarUrl:profile.avatarUrl||''});}},[profile,form]);
   useEffect(() => {
     if (!bioMenuOpen && !usernameMenuOpen) return;
     function closeMenu(event: PointerEvent) {
@@ -758,7 +776,7 @@ function ProfilePage() {
     setPath('/profile/username');
   }
   async function copyUsername() {
-    const username = profile?.username.trim() ?? '';
+    const username = profile?.username?.trim() ?? '';
     setUsernameMenuOpen(false);
     if (!username) {
       setUsernameNotice('Имя пользователя пока не задано.');
@@ -820,7 +838,7 @@ function ProfilePage() {
           </button>
         </div>
         <h1>{profile?.displayName || 'Пользователь'}</h1>
-        <span className="tg-profile-status">{formatPhone(user?.phone)} · @{profile?.username || 'username'}</span>
+        <span className="tg-profile-status">{formatPhone(user?.phone)} · ID {profile?.publicId}</span>
       </header>
 
       <div className="tg-profile-actions" aria-label="Действия профиля">
@@ -836,6 +854,10 @@ function ProfilePage() {
       </div>
 
       <section className="tg-profile-card glass-card" aria-label="Данные профиля">
+        <div className="tg-profile-info-row">
+          <p>{profile?.publicId}</p>
+          <span>ID пользователя</span>
+        </div>
         <div className="tg-profile-info-row">
           <p>{formatPhone(user?.phone)}</p>
           <span>Телефон</span>
@@ -870,7 +892,7 @@ function ProfilePage() {
             onClick={() => { setUsernameNotice(''); setBioMenuOpen(false); setUsernameMenuOpen(value => !value); }}
             data-testid="button-profile-username-menu"
           >
-            <p className="tg-profile-username">@{profile?.username || 'username'}</p>
+            <p className="tg-profile-username">{profile?.username ? `@${profile.username}` : 'Не задано'}</p>
             <span>Имя пользователя</span>
           </button>
           {usernameMenuOpen && <div className="tg-profile-username-menu glass-card" role="menu" aria-label="Действия с именем пользователя">
@@ -917,7 +939,7 @@ function AccountEditPage() {
     const name = splitDisplayName(profile.displayName);
     setFirstName(name.firstName);
     setLastName(name.lastName);
-    setUsername(profile.username);
+    setUsername(profile.username || '');
     setBio(profile.bio);
     setError('');
   }, [profile?.id, profile?.displayName, profile?.username, profile?.bio]);
@@ -946,7 +968,7 @@ function AccountEditPage() {
       return;
     }
     const normalizedUsername = username.trim().replace(/^@/, '').toLowerCase();
-    if (!/^[a-z][a-z0-9_]{4,31}$/.test(normalizedUsername)) {
+    if (normalizedUsername && !/^[a-z][a-z0-9_]{4,31}$/.test(normalizedUsername)) {
       setError('Имя пользователя: от 5 до 32 латинских букв, цифр или знаков подчёркивания.');
       return;
     }
@@ -1065,7 +1087,7 @@ function UsernameEditPage() {
 
   useEffect(() => {
     if (profile) {
-      setUsername(profile.username);
+      setUsername(profile.username || '');
       setError('');
     }
   }, [profile?.id, profile?.username]);
@@ -1160,6 +1182,76 @@ function StarsPage() {
   </div>;
 }
 
+function AdminStarsPage() {
+  const { user } = useAuth();
+  const [publicId, setPublicId] = useState('');
+  const [amount, setAmount] = useState('100');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setFeedback('');
+    setBusy(true);
+    try {
+      const result = await apiRequest<{ balance: number }>('/api/messenger/admin/stars', {
+        method: 'POST',
+        body: JSON.stringify({ publicId: publicId.trim(), amount: Number(amount) }),
+      });
+      setFeedback(`Звёзды начислены. Новый баланс: ${result.balance}.`);
+    } catch (cause) {
+      setError(userError(cause, 'Не удалось начислить звёзды.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!user?.isAdmin) {
+    return <div className="page-content narrow-page"><PageHeader kicker="УПРАВЛЕНИЕ MONOGRAM" title="Админ-панель" description="Доступ запрещён."/><StateBlock title="Нет доступа" detail="Эта панель доступна только аккаунту администратора."/></div>;
+  }
+
+  return <div className="page-content narrow-page">
+    <PageHeader kicker="УПРАВЛЕНИЕ MONOGRAM" title="Админ-панель" description="Начисление звёзд на баланс пользователя по его числовому ID."/>
+    <form className="glass-card settings-card form-stack" onSubmit={event => void submit(event)}>
+      <div data-slot="form-item">
+        <label htmlFor="admin-user-id">ID пользователя</label>
+        <Input
+          id="admin-user-id"
+          inputMode="numeric"
+          pattern="[0-9]+"
+          required
+          value={publicId}
+          onChange={event => setPublicId(event.target.value.replace(/\D/g, ''))}
+          placeholder="Например, 12345"
+          data-testid="input-admin-user-id"
+        />
+      </div>
+      <div data-slot="form-item">
+        <label htmlFor="admin-stars-amount">Количество звёзд</label>
+        <Input
+          id="admin-stars-amount"
+          type="number"
+          min={1}
+          max={1000000}
+          step={1}
+          required
+          value={amount}
+          onChange={event => setAmount(event.target.value)}
+          data-testid="input-admin-stars-amount"
+        />
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {feedback && <p className="saved-note" role="status">{feedback}</p>}
+      <Button className="primary-button" type="submit" disabled={busy || !publicId || !amount} data-testid="button-admin-grant-stars">
+        {busy ? <><LoaderCircle className="spin" size={16}/> Начисляем…</> : <><Star size={16}/> Выдать звёзды</>}
+      </Button>
+      <p className="mono-settings-empty">Операция сохраняется в истории звёзд пользователя.</p>
+    </form>
+  </div>;
+}
+
 function ContactsPage() {
   const { user } = useAuth();
   const [, setPath] = useLocation();
@@ -1168,7 +1260,7 @@ function ContactsPage() {
   const normalizedTerm = term.trim().replace(/^@/, '');
   const search = useUserSearch(normalizedTerm, user?.id || '');
   const startConversation = useStartConversation(user?.id || '');
-  const canSearch = normalizedTerm.length >= 2;
+  const canSearch = canSearchUsers(normalizedTerm);
 
   async function openConversation(username: string) {
     setError('');
@@ -1184,7 +1276,7 @@ function ContactsPage() {
     <PageHeader
       kicker="ЛЮДИ MONOGRAM"
       title="Контакты"
-      description="Найдите человека по имени пользователя и начните переписку."
+      description="Найдите человека по имени пользователя или числовому ID."
     />
     <label className="mono-contact-search glass-card">
       <Search size={18} />
@@ -1192,30 +1284,30 @@ function ContactsPage() {
         aria-label="Поиск контактов"
         autoComplete="off"
         onChange={(event) => setTerm(event.target.value)}
-        placeholder="Имя пользователя"
+        placeholder="Имя пользователя или ID"
         value={term}
       />
       {term && <button type="button" aria-label="Очистить поиск" onClick={() => setTerm('')}><X size={16} /></button>}
     </label>
     {error && <p className="mono-contact-error" role="alert">{error}</p>}
     {!canSearch
-      ? <div className="mono-contact-hint"><CircleUserRound size={23} /><b>Поиск по имени пользователя</b><span>Введите не менее двух символов.</span></div>
+      ? <div className="mono-contact-hint"><CircleUserRound size={23} /><b>Поиск по имени пользователя или ID</b><span>Введите имя пользователя или числовой ID.</span></div>
       : search.isLoading
         ? <StateBlock title="Ищем контакты" detail="Подождите немного." />
         : search.isError
           ? <StateBlock title="Не удалось выполнить поиск" detail="Проверьте соединение и попробуйте ещё раз." action="Повторить" onAction={() => { void search.refetch(); }} />
           : !search.data?.length
-            ? <StateBlock title="Никого не нашли" detail="Проверьте имя пользователя и попробуйте ещё раз." />
+            ? <StateBlock title="Никого не нашли" detail="Проверьте имя пользователя или числовой ID." />
             : <div className="mono-contact-list">
               {search.data.map((person) => <button
                 className="mono-contact-result glass-card"
                 disabled={startConversation.isPending}
                 key={person.id}
-                onClick={() => { void openConversation(person.username); }}
+                onClick={() => { void openConversation(person.username || person.publicId); }}
                 type="button"
               >
                 <Avatar profile={person} />
-                <span><b>{person.displayName}</b><small>@{person.username}</small></span>
+                <span><b>{person.displayName}</b><small>{profileIdentifier(person)}</small></span>
                 <ArrowRight size={18} />
               </button>)}
             </div>}
@@ -1306,6 +1398,7 @@ function SettingsPage() {
   };
   const settingsRows: SettingsMenuRow[] = [
     { label: 'Аккаунт', description: 'Имя, номер и имя пользователя', icon: CircleUserRound, color: '#3390ec', href: '/profile/edit', testId: 'settings-account' },
+    ...(user?.isAdmin ? [{ label: 'Админ-панель', description: 'Выдача звёзд пользователям', icon: Shield, color: '#477dff', href: '/admin', testId: 'settings-admin' }] : []),
     { label: 'Настройки чатов', description: 'Предпросмотр и отправка сообщений', icon: MessageCircle, color: '#e6a02f', section: 'chats', testId: 'settings-chats' },
     { label: 'Конфиденциальность', description: 'Статус «в сети»', icon: LockKeyhole, color: '#32b56a', section: 'privacy', testId: 'settings-privacy' },
     { label: 'Уведомления', description: 'Уведомления о новых сообщениях', icon: Bell, color: '#df5361', section: 'notifications', testId: 'settings-notifications' },
@@ -1505,7 +1598,7 @@ function SettingsPage() {
         <span className="mono-settings-camera"><Camera size={16}/></span>
       </button>
       <b>{profile?.displayName || 'Пользователь'}</b>
-      <span>{formatPhone(user?.phone)} · @{profile?.username || 'username'}</span>
+      <span>{formatPhone(user?.phone)} · ID {profile?.publicId || '—'}</span>
     </section>
     {searchOpen && <label className="mono-settings-search">
       <Search size={17} aria-hidden="true"/>
@@ -1549,6 +1642,7 @@ function AppRoutes() {
     <Route path="/profile/username" component={UsernameEditPage}/>
     <Route path="/profile" component={ProfilePage}/>
     <Route path="/stars" component={StarsPage}/>
+    <Route path="/admin" component={AdminStarsPage}/>
     <Route component={NotFound}/>
   </Switch></ErrorBoundary></AppShell>;
 }

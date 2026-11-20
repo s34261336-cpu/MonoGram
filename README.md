@@ -38,11 +38,15 @@ In Render, choose **New > Blueprint** and connect this repository. Add these two
 
 Render generates `SESSION_SECRET` automatically. Keep the service-role key on the server; it must not be added to frontend variables. Apply `supabase/schema.sql` to the Supabase project once before using registration.
 
+To enable the admin account, also set `ADMIN_PHONE` to its Russian phone number and `ADMIN_LOGIN_CODE` to a private random secret of at least 32 characters. Keep the secret only in server environment settings; it is never sent to the browser. The admin account is created automatically on its first successful sign-in with that phone and secret. Without both settings, admin access is disabled.
+
 If a static Render service named `monogram` already exists, leave it in place until `monogram-fullstack` is deployed and verified. The new Blueprint uses a different name so it does not replace the existing service.
 
 ## Behavior and limits
 
 - Sign-in and registration use a five-digit demo code shown on screen; no SMS is sent.
+- New profiles receive a numeric ID; users can set a username later in profile settings.
+- The configured admin can grant up to 1,000,000 stars per operation by numeric user ID.
 - Demo codes expire after five minutes.
 - Direct messages, channels, and reactions are stored in Supabase.
 - Online status and database updates use Supabase Realtime.

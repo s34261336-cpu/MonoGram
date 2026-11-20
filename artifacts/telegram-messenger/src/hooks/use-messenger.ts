@@ -83,7 +83,7 @@ export function useUserSearch(term: string, userId: string) {
   return useQuery({
     queryKey: messengerKeys.userSearch(userId, term.trim()),
     queryFn: () => searchUsers(term, userId),
-    enabled: Boolean(userId && term.trim().length >= 2),
+    enabled: Boolean(userId && (term.trim().length >= 2 || /^\d+$/.test(term.trim()))),
     staleTime: 15_000,
   });
 }

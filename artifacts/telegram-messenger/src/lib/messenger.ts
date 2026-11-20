@@ -2,7 +2,8 @@ import { apiRequest } from '@/lib/api';
 
 export type Profile = {
   id: string;
-  username: string;
+  publicId: string;
+  username: string | null;
   displayName: string;
   bio: string;
   avatarUrl: string | null;

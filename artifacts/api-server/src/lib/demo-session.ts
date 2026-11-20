@@ -61,6 +61,32 @@ export function normalizeRuPhone(value: unknown): string {
   return `+${digits}`;
 }
 
+export function isAdminPhone(phone: string) {
+  const configuredPhone = process.env.ADMIN_PHONE;
+  return configuredPhone ? normalizeRuPhone(configuredPhone) === phone : false;
+}
+
+function adminLoginCode() {
+  const code = process.env.ADMIN_LOGIN_CODE;
+  if (!code || code.length < 32 || code.length > 256) {
+    throw new Error('ADMIN_LOGIN_CODE must contain 32 to 256 characters.');
+  }
+  return code;
+}
+
+export function verifyAdminLoginCode(value: unknown) {
+  const expectedCode = adminLoginCode();
+  const supplied = typeof value === 'string' ? value : '';
+  if (supplied.length > 256) return false;
+  const expected = Buffer.from(expectedCode);
+  const actual = Buffer.from(supplied);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+export function validateAdminLoginCodeConfig() {
+  adminLoginCode();
+}
+
 export function issueDemoCode(phone: string) {
   const now = Date.now();
   const existing = codesByPhone.get(phone);

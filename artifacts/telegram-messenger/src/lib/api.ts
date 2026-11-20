@@ -3,6 +3,7 @@ const SESSION_KEY = 'monogram.demo.session';
 export type DemoUser = {
   id: string;
   phone: string;
+  isAdmin: boolean;
 };
 
 export type StoredDemoSession = {
@@ -20,7 +21,10 @@ export function readStoredDemoSession(): StoredDemoSession | null {
       typeof parsed.user?.id !== 'string' ||
       typeof parsed.user?.phone !== 'string'
     ) return null;
-    return { sessionToken: parsed.sessionToken, user: parsed.user };
+    return {
+      sessionToken: parsed.sessionToken,
+      user: { ...parsed.user, isAdmin: parsed.user.isAdmin === true },
+    };
   } catch {
     return null;
   }

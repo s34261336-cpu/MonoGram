@@ -2,20 +2,21 @@ import { Router, type IRouter, type Request, type Response, type RequestHandler 
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { RequestMessengerUploadUrlBody, RequestMessengerUploadUrlResponse } from '@workspace/api-zod';
-import { requireDemoSession } from '../lib/demo-session';
+import { isAdminPhone, requireDemoSession } from '../lib/demo-session';
 import { supabaseAdmin } from '../lib/supabase-admin';
 import { ObjectNotFoundError, ObjectStorageService } from '../lib/objectStorage';
 
 type ProfileRow = {
   id: string;
-  username: string;
+  public_id: number | string;
+  username: string | null;
   display_name: string;
   bio: string | null;
   avatar_url: string | null;
 };
 
 const router: IRouter = Router();
-const profileFields = 'id, username, display_name, bio, avatar_url';
+const profileFields = 'id, public_id, username, display_name, bio, avatar_url';
 const imageMessagePrefix = 'MONOGRAM_IMAGE_V1:';
 const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const maxImageBytes = 10 * 1024 * 1024;
@@ -38,6 +39,7 @@ function escapeLikePattern(value: string) {
 function toProfile(row: ProfileRow) {
   return {
     id: row.id,
+    publicId: String(row.public_id),
     username: row.username,
     displayName: row.display_name,
     bio: row.bio ?? '',
@@ -142,13 +144,14 @@ router.get('/profile', handleRoute(async (req, res) => {
 router.patch('/profile', handleRoute(async (req, res) => {
   const id = userId(req);
   const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
-  const username = typeof req.body?.username === 'string'
+  const usernameInput = typeof req.body?.username === 'string'
     ? req.body.username.trim().toLowerCase().replace(/^@/, '')
     : '';
+  const username = usernameInput || null;
   const bio = typeof req.body?.bio === 'string' ? req.body.bio.trim().slice(0, 280) : '';
   const avatarUrl = typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl.trim() || null : null;
   if (displayName.length < 2 || displayName.length > 80) throw apiError('Имя должно содержать от 2 до 80 символов.');
-  if (!/^[a-z][a-z0-9_]{4,31}$/.test(username)) throw apiError('Имя пользователя: латинская буква в начале и от 5 до 32 символов.');
+  if (username && !/^[a-z][a-z0-9_]{4,31}$/.test(username)) throw apiError('Имя пользователя: латинская буква в начале и от 5 до 32 символов.');
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update({ display_name: displayName, username, bio, avatar_url: avatarUrl, updated_at: new Date().toISOString() })
@@ -169,12 +172,21 @@ router.get('/search', handleRoute(async (req, res) => {
     .replace(/\s+/g, ' ')
     .slice(0, 80)
     .toLocaleLowerCase('ru');
-  if (query.length < 2) {
+  if (query.length < 2 && !/^\d+$/.test(query)) {
     res.json([]);
     return;
   }
   const usernameQuery = query.replace(/[^a-z0-9_]/g, '');
   const searches = [];
+  if (/^\d+$/.test(query)) {
+    searches.push(
+      supabaseAdmin.from('profiles')
+        .select(profileFields)
+        .neq('id', id)
+        .eq('public_id', query)
+        .limit(100),
+    );
+  }
   if (usernameQuery.length >= 2) {
     searches.push(
       supabaseAdmin.from('profiles')
@@ -199,8 +211,9 @@ router.get('/search', handleRoute(async (req, res) => {
     for (const row of response.data ?? []) matches.set(row.id, row as ProfileRow);
   }
   const score = (row: ProfileRow) => {
-    const username = row.username.toLocaleLowerCase('ru');
+    const username = row.username?.toLocaleLowerCase('ru') || '';
     const displayName = row.display_name.toLocaleLowerCase('ru');
+    if (String(row.public_id) === query) return 0;
     if (username === query) return 0;
     if (displayName === query) return 1;
     if (username.startsWith(query)) return 2;
@@ -211,9 +224,30 @@ router.get('/search', handleRoute(async (req, res) => {
   const orderedMatches = [...matches.values()].sort((left, right) => (
     score(left) - score(right)
     || left.display_name.localeCompare(right.display_name, 'ru')
-    || left.username.localeCompare(right.username, 'ru')
+    || (left.username || '').localeCompare(right.username || '', 'ru')
   ));
   res.json(orderedMatches.slice(0, 100).map(row => toProfile(row)));
+}));
+
+router.post('/admin/stars', handleRoute(async (req, res) => {
+  const phone = req.demoIdentity?.phone;
+  if (!phone || !isAdminPhone(phone)) throw apiError('Доступно только администратору.', 403);
+
+  const publicId = typeof req.body?.publicId === 'string' || typeof req.body?.publicId === 'number'
+    ? String(req.body.publicId).trim()
+    : '';
+  const amount = Number(req.body?.amount);
+  if (!/^[1-9]\d{0,17}$/.test(publicId)) throw apiError('Введите корректный ID пользователя.');
+  if (!Number.isInteger(amount) || amount < 1 || amount > 1000000) {
+    throw apiError('Количество звёзд должно быть от 1 до 1000000.');
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('grant_admin_stars', {
+    p_public_id: publicId,
+    p_amount: amount,
+  });
+  checkError(error);
+  res.json({ balance: data });
 }));
 
 router.get('/wallet', handleRoute(async (req, res) => {
@@ -444,7 +478,7 @@ router.post('/messages', handleRoute(async (req, res) => {
     conversationId: data.conversation_id,
     authorId: data.author_id,
     authorName: profile.display_name,
-    authorUsername: profile.username,
+    authorUsername: profile.username ?? '',
     content,
     imageUrl: imageUrlFor(data.id, imagePath || null),
     createdAt: data.created_at,
