@@ -626,8 +626,8 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
 .input-prefix input { border: 0; background: transparent !important; }
 .saved-note { font-size: 14px; color: var(--green); }
 
-/* ---------- Диалоги (нижняя панель на телефоне) ---------- */
-.modal-backdrop { z-index: 80; align-items: end; padding: 0; background: rgba(10, 18, 30, .38); -webkit-backdrop-filter: blur(10px) saturate(120%); backdrop-filter: blur(10px) saturate(120%); }
+/* ---------- Диалоги ---------- */
+.modal-backdrop { z-index: 80; align-items: center; padding: 24px; background: rgba(10, 18, 30, .38); -webkit-backdrop-filter: blur(10px) saturate(120%); backdrop-filter: blur(10px) saturate(120%); }
 .dialog,
 [role="dialog"][data-state],
 [role="alertdialog"] {
@@ -636,15 +636,17 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
   overflow: hidden;
   color: var(--text);
   background:
-    radial-gradient(ellipse 110% 55% at 50% -18%, rgba(255, 255, 255, .34), transparent 66%),
-    linear-gradient(145deg, color-mix(in srgb, var(--glass-card) 92%, rgba(255, 255, 255, .08)), var(--glass-card));
-  border: 1px solid var(--glass-border);
+    radial-gradient(ellipse 105% 60% at 50% -12%, rgba(255, 255, 255, .3), transparent 70%),
+    linear-gradient(145deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .045)),
+    var(--glass);
+  border: 1px solid rgba(255, 255, 255, .3);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .68),
-    inset 0 -1px 0 rgba(255, 255, 255, .16),
-    0 24px 64px rgba(10, 24, 42, .24);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
-  backdrop-filter: blur(34px) saturate(180%);
+    inset 0 1px 0 rgba(255, 255, 255, .56),
+    inset 0 -1px 0 rgba(255, 255, 255, .1),
+    0 28px 72px rgba(10, 24, 42, .32),
+    0 4px 14px rgba(10, 24, 42, .16);
+  -webkit-backdrop-filter: blur(38px) saturate(175%);
+  backdrop-filter: blur(38px) saturate(175%);
 }
 .dialog::before,
 [role="dialog"][data-state]::before,
@@ -660,9 +662,23 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
   pointer-events: none;
 }
 .dialog {
-  width: min(100%, 520px); margin: 0 auto; padding: 26px 20px calc(22px + var(--safe-b));
-  border-radius: 32px 32px 0 0; border-bottom: 0;
+  width: min(100%, 520px); margin: auto; padding: 28px;
+  border-radius: 32px;
   animation: sheet-up .3s cubic-bezier(.3, .9, .3, 1);
+}
+.dialog button:not(.primary-button),
+[role="dialog"][data-state] button:not(.primary-button),
+[role="alertdialog"] button:not(.primary-button) {
+  border: 1px solid rgba(255, 255, 255, .24);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 4px 14px rgba(10, 24, 42, .1);
+  -webkit-backdrop-filter: blur(20px) saturate(155%);
+  backdrop-filter: blur(20px) saturate(155%);
+}
+.dialog button:not(.primary-button):hover,
+[role="dialog"][data-state] button:not(.primary-button):hover,
+[role="alertdialog"] button:not(.primary-button):hover {
+  background: linear-gradient(145deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .12));
 }
 .dialog h2 { margin: 8px 0 6px; font-size: 22px; font-weight: 700; color: var(--text); }
 .dialog > p { font-size: 15px; line-height: 1.45; color: var(--text-2); margin: 0 0 18px; }
@@ -689,6 +705,8 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
 
 /* ---------- Телефон ---------- */
 @media (max-width: 680px) {
+  .modal-backdrop { align-items: end; padding: 0; }
+  .dialog { width: min(100%, 520px); margin: 0 auto; padding: 26px 20px calc(22px + var(--safe-b)); border-radius: 32px 32px 0 0; border-bottom: 0; }
   .chat-layout { display: block; position: relative; }
   .chat-sidebar { height: 100%; width: 100%; }
   .chat-stage { display: none; }
