@@ -24,17 +24,23 @@ import { ru } from 'date-fns/locale';
 import './auth-screen.css';
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 12_000, retry: 1, refetchOnWindowFocus: true } } });
+const wallpaperArtwork: Record<ChatWallpaper, string> = {
+  default: new URL('./assets/chat-wallpapers/winter.svg', import.meta.url).href,
+  blue: new URL('./assets/chat-wallpapers/flowers.svg', import.meta.url).href,
+  green: new URL('./assets/chat-wallpapers/night.svg', import.meta.url).href,
+  warm: new URL('./assets/chat-wallpapers/doodles.svg', import.meta.url).href,
+};
 const chatWallpaperOptions: { value: ChatWallpaper; label: string; background: string }[] = [
-  { value: 'default', label: 'Стандартные', background: 'linear-gradient(145deg, #dceaf8, #e1eee9)' },
-  { value: 'blue', label: 'Голубые', background: 'linear-gradient(145deg, #bfdcf4, #c8d8f2)' },
-  { value: 'green', label: 'Зелёные', background: 'linear-gradient(145deg, #c5e8d8, #c4e3e7)' },
-  { value: 'warm', label: 'Тёплые', background: 'linear-gradient(145deg, #f1d8c6, #e8d4e8)' },
+  { value: 'default', label: 'Лес', background: `linear-gradient(145deg, rgba(220,234,248,.68), rgba(225,238,233,.68)), url("${wallpaperArtwork.default}")` },
+  { value: 'blue', label: 'Цветы', background: `linear-gradient(145deg, rgba(191,220,244,.68), rgba(200,216,242,.68)), url("${wallpaperArtwork.blue}")` },
+  { value: 'green', label: 'Ночь', background: `linear-gradient(145deg, rgba(197,232,216,.68), rgba(196,227,231,.68)), url("${wallpaperArtwork.green}")` },
+  { value: 'warm', label: 'Узоры', background: `linear-gradient(145deg, rgba(241,216,198,.68), rgba(232,212,232,.68)), url("${wallpaperArtwork.warm}")` },
 ];
 const chatAccentOptions: { value: ChatAccent; label: string; background: string }[] = [
-  { value: 'blue', label: 'Синяя', background: 'linear-gradient(145deg, #55adf8, #2580d8)' },
-  { value: 'violet', label: 'Фиолетовая', background: 'linear-gradient(145deg, #ae8bfa, #7955d9)' },
-  { value: 'green', label: 'Зелёная', background: 'linear-gradient(145deg, #5bc995, #279d75)' },
-  { value: 'amber', label: 'Янтарная', background: 'linear-gradient(145deg, #f3b65e, #dc8641)' },
+  { value: 'blue', label: 'Синий', background: 'linear-gradient(145deg, #55adf8, #2580d8)' },
+  { value: 'violet', label: 'Лиловый', background: 'linear-gradient(145deg, #ae8bfa, #7955d9)' },
+  { value: 'green', label: 'Зелёный', background: 'linear-gradient(145deg, #5bc995, #279d75)' },
+  { value: 'amber', label: 'Золотой', background: 'linear-gradient(145deg, #f3b65e, #dc8641)' },
 ];
 const chatNameColorOptions: { value: ChatNameColor; label: string; color: string }[] = [
   { value: 'default', label: 'Стандартный', color: '#718097' },
@@ -44,10 +50,10 @@ const chatNameColorOptions: { value: ChatNameColor; label: string; color: string
   { value: 'rose', label: 'Розовый', color: '#d66082' },
 ];
 const chatWallpaperBackgrounds: Record<ChatWallpaper, string> = {
-  default: 'var(--chat-bg)',
-  blue: 'linear-gradient(160deg, #d5e9fb, #dce4f6 55%, #cfe7ed)',
-  green: 'linear-gradient(160deg, #d3eee2, #d8ece7 55%, #d2e8ef)',
-  warm: 'linear-gradient(160deg, #f3e1d3, #f0e2e8 55%, #eadbf0)',
+  default: chatWallpaperOptions[0].background,
+  blue: chatWallpaperOptions[1].background,
+  green: chatWallpaperOptions[2].background,
+  warm: chatWallpaperOptions[3].background,
 };
 const chatAccentBackgrounds: Record<ChatAccent, string> = {
   blue: 'linear-gradient(145deg, #55adf8, #2580d8)',
@@ -1533,6 +1539,7 @@ function SettingsPage() {
                 type="button"
                 key={option.value}
                 aria-pressed={preferences.chatWallpaper === option.value}
+                aria-label={`Обои: ${option.label}`}
                 onClick={() => updatePreference('chatWallpaper', option.value)}
                 data-testid={`chat-wallpaper-${option.value}`}
               >
@@ -1649,7 +1656,7 @@ function SettingsPage() {
         content = <StateBlock title="Раздел не найден" detail="Вернитесь к списку настроек." action="К настройкам" onAction={() => setPath('/settings')}/>;
     }
 
-    return <div className="page-content mono-page mono-settings-detail-page">
+    return <div className={`page-content mono-page mono-settings-detail-page ${section === 'chats' ? 'mono-settings-detail-content--chats' : ''}`}>
       <header className="mono-screen-header mono-settings-detail-header">
         <button type="button" onClick={() => setPath('/settings')} aria-label="Назад к настройкам"><ArrowLeft size={21}/></button>
         <h1>{sectionTitles[section] || 'Настройки'}</h1>
