@@ -120,15 +120,38 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .primary-button, .outline-button {
   min-height: 50px; padding: 0 22px; gap: 8px;
   border-radius: 25px; font-size: 16px; font-weight: 600;
-  transition: transform .15s, filter .15s, background .2s;
+  transition: transform .15s, filter .15s, background .2s, box-shadow .2s;
 }
 .primary-button {
-  background: linear-gradient(160deg, #4fa8f6, #2681d9); color: #fff; border: 0;
-  box-shadow: 0 8px 20px rgba(38, 129, 217, .35), inset 0 1px 0 rgba(255, 255, 255, .4);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 90% 130% at 50% -20%, rgba(255, 255, 255, .38), transparent 58%),
+    linear-gradient(160deg, #55acf6 0%, #398fe5 58%, #2478cb 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .42);
+  box-shadow:
+    0 10px 24px rgba(38, 129, 217, .34),
+    0 3px 8px rgba(18, 82, 145, .18),
+    inset 0 1px 0 rgba(255, 255, 255, .62),
+    inset 0 -1px 0 rgba(16, 91, 166, .34);
+  -webkit-backdrop-filter: blur(14px) saturate(155%);
+  backdrop-filter: blur(14px) saturate(155%);
 }
-.primary-button:hover { background: linear-gradient(160deg, #5db1fa, #2b88e2); transform: none; }
+.primary-button::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 1px 8px auto;
+  height: 44%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .26), transparent);
+  pointer-events: none;
+}
+.primary-button:hover { background: linear-gradient(160deg, #65b5f8 0%, #4599ec 58%, #2b82d5 100%); transform: none; }
 .primary-button:active, .outline-button:active { transform: scale(.96); }
-.primary-button:disabled { opacity: .5; transform: none; }
+.primary-button:disabled { opacity: .5; transform: none; box-shadow: none; }
 .outline-button {
   background: var(--glass); color: var(--blue); border: 1px solid var(--glass-border);
   -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--glass-edge);
@@ -604,11 +627,42 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
 .saved-note { font-size: 14px; color: var(--green); }
 
 /* ---------- Диалоги (нижняя панель на телефоне) ---------- */
-.modal-backdrop { z-index: 80; align-items: end; padding: 0; background: rgba(10, 18, 30, .38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.modal-backdrop { z-index: 80; align-items: end; padding: 0; background: rgba(10, 18, 30, .38); -webkit-backdrop-filter: blur(10px) saturate(120%); backdrop-filter: blur(10px) saturate(120%); }
+.dialog,
+[role="dialog"][data-state],
+[role="alertdialog"] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--text);
+  background:
+    radial-gradient(ellipse 110% 55% at 50% -18%, rgba(255, 255, 255, .34), transparent 66%),
+    linear-gradient(145deg, color-mix(in srgb, var(--glass-card) 92%, rgba(255, 255, 255, .08)), var(--glass-card));
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .68),
+    inset 0 -1px 0 rgba(255, 255, 255, .16),
+    0 24px 64px rgba(10, 24, 42, .24);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(34px) saturate(180%);
+}
+.dialog::before,
+[role="dialog"][data-state]::before,
+[role="alertdialog"]::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .12), transparent 28%),
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, .16), transparent 24%);
+  pointer-events: none;
+}
 .dialog {
   width: min(100%, 520px); margin: 0 auto; padding: 26px 20px calc(22px + var(--safe-b));
-  border-radius: 32px 32px 0 0; border-bottom: 0; color: var(--text);
-  background: var(--glass-strong); animation: sheet-up .3s cubic-bezier(.3, .9, .3, 1);
+  border-radius: 32px 32px 0 0; border-bottom: 0;
+  animation: sheet-up .3s cubic-bezier(.3, .9, .3, 1);
 }
 .dialog h2 { margin: 8px 0 6px; font-size: 22px; font-weight: 700; color: var(--text); }
 .dialog > p { font-size: 15px; line-height: 1.45; color: var(--text-2); margin: 0 0 18px; }
