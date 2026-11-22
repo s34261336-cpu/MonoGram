@@ -142,7 +142,6 @@ function AuthScreen() {
   const { requestDemoCode, verifyDemoCode } = useAuth();
   const [phoneDigits, setPhoneDigits] = useState('');
   const [demoCode, setDemoCode] = useState('');
-  const [requiresAdminCode, setRequiresAdminCode] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [error, setError] = useState('');
@@ -167,9 +166,7 @@ function AuthScreen() {
     setError('');
     setBusy(true);
     try {
-      const result = await requestDemoCode(`+7${phoneDigits}`);
-      setDemoCode(result.demoCode || '');
-      setRequiresAdminCode(result.requiresAdminCode);
+      setDemoCode(await requestDemoCode(`+7${phoneDigits}`));
       setInputCode('');
       setCodeFeedback('idle');
       setStep('code');
@@ -181,10 +178,10 @@ function AuthScreen() {
 
   async function confirmCode(event: FormEvent) {
     event.preventDefault();
-    if (requiresAdminCode ? !inputCode : inputCode.length !== 5) {
+    if (inputCode.length !== 5) {
       setCodeFeedback('error');
       setShakeKey(current => current + 1);
-      setError(requiresAdminCode ? 'Введите код администратора.' : 'Введите все пять цифр кода.');
+      setError('Введите все пять цифр кода.');
       return;
     }
     setError('');
@@ -249,41 +246,19 @@ function AuthScreen() {
           <Button className="mono-auth__submit" type="submit" disabled={busy || phoneDigits.length !== 10} data-testid="button-request-code">
             {busy ? <><LoaderCircle className="spin" size={17} /> Подождите</> : <>Далее <ArrowRight size={17} /></>}
           </Button>
-          <p className="mono-auth__hint">Для обычного входа код появится на экране; SMS не отправляется.</p>
+          <p className="mono-auth__hint">На этом демо-этапе код появится на экране, SMS не отправляется.</p>
         </form> : <form className="mono-auth__form" onSubmit={confirmCode}>
-          {!requiresAdminCode && <div className="mono-auth__demo-code" role="status" data-testid="demo-code">
+          <div className="mono-auth__demo-code" role="status" data-testid="demo-code">
             <span>Ваш демо-код</span>
             <strong>{demoCode}</strong>
-          </div>}
+          </div>
           <div className="mono-auth__field">
-            <label htmlFor={requiresAdminCode ? 'input-admin-code' : 'input-demo-code'}>
-              {requiresAdminCode ? 'Код администратора' : 'Код из пяти цифр'}
-            </label>
-            {requiresAdminCode
-              ? <div className="mono-auth__control">
-                <Shield size={17} aria-hidden="true" />
-                <input
-                  id="input-admin-code"
-                  type="password"
-                  autoComplete="current-password"
-                  aria-label="Код администратора"
-                  aria-invalid={codeFeedback === 'error'}
-                  maxLength={256}
-                  value={inputCode}
-                  disabled={busy || codeFeedback === 'success'}
-                  onChange={event => {
-                    setInputCode(event.target.value);
-                    if (codeFeedback === 'error') setCodeFeedback('idle');
-                    if (error) setError('');
-                  }}
-                  data-testid="input-admin-code"
-                />
-              </div>
-              : <div
-                className="mono-auth__otp-frame"
-                data-feedback={codeFeedback}
-                data-shake={shakeKey % 2}
-              >
+            <label htmlFor="input-demo-code">Код из пяти цифр</label>
+            <div
+              className="mono-auth__otp-frame"
+              data-feedback={codeFeedback}
+              data-shake={shakeKey % 2}
+            >
               <InputOTP
                 id="input-demo-code"
                 maxLength={5}
@@ -314,16 +289,16 @@ function AuthScreen() {
                   ))}
                 </InputOTPGroup>
               </InputOTP>
-              </div>}
+            </div>
           </div>
           {error && <p className="mono-auth__error" role="alert" data-testid="auth-message">{error}</p>}
           {codeFeedback === 'success' && <p className="mono-auth__success-message" role="status">Код подтверждён. Открываем чаты…</p>}
-          <Button className="mono-auth__submit" type="submit" disabled={busy || (requiresAdminCode ? !inputCode : inputCode.length !== 5)} data-testid="button-confirm-code">
+          <Button className="mono-auth__submit" type="submit" disabled={busy || inputCode.length !== 5} data-testid="button-confirm-code">
             {busy
               ? <><LoaderCircle className="spin" size={17} /> Проверяем</>
               : <>Подтвердить <Check size={17} /></>}
           </Button>
-          <button className="mono-auth__back" type="button" onClick={() => { setError(''); setStep('phone'); setRequiresAdminCode(false); }} data-testid="button-edit-phone">
+          <button className="mono-auth__back" type="button" onClick={() => { setError(''); setStep('phone'); }} data-testid="button-edit-phone">
             <ArrowLeft size={15} /> Изменить номер
           </button>
         </form>}

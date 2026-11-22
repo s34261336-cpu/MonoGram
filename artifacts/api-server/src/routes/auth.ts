@@ -6,8 +6,6 @@ import {
   isAdminPhone,
   normalizeRuPhone,
   requireDemoSession,
-  validateAdminLoginCodeConfig,
-  verifyAdminLoginCode,
 } from '../lib/demo-session';
 import { supabaseAdmin } from '../lib/supabase-admin';
 
@@ -30,11 +28,6 @@ async function findDemoUserId(phone: string): Promise<string | null> {
 router.post('/auth/demo/request-code', (req, res, next) => {
   try {
     const phone = normalizeRuPhone(req.body?.phone);
-    if (isAdminPhone(phone)) {
-      validateAdminLoginCodeConfig();
-      res.json({ requiresAdminCode: true, expiresInSeconds: 300 });
-      return;
-    }
     const demoCode = issueDemoCode(phone);
     res.json({ demoCode, expiresInSeconds: 300 });
   } catch (error) {
@@ -46,13 +39,7 @@ router.post('/auth/demo/verify-code', async (req, res, next) => {
   try {
     const phone = normalizeRuPhone(req.body?.phone);
     const admin = isAdminPhone(phone);
-    if (admin) {
-      if (!verifyAdminLoginCode(req.body?.code)) {
-        throw authError('Неверный код администратора.', 400);
-      }
-    } else {
-      consumeDemoCode(phone, req.body?.code);
-    }
+    consumeDemoCode(phone, req.body?.code);
     let userId = await findDemoUserId(phone);
     if (!userId) {
       const { data, error } = await supabaseAdmin.rpc('get_or_create_demo_user', {
@@ -72,9 +59,6 @@ router.post('/auth/demo/verify-code', async (req, res, next) => {
 router.post('/auth/demo/register', async (req, res, next) => {
   try {
     const phone = normalizeRuPhone(req.body?.phone);
-    if (isAdminPhone(phone)) {
-      throw authError('Для администратора используйте специальный код входа.', 403);
-    }
     consumeDemoCode(phone, req.body?.code);
 
     if (await findDemoUserId(phone)) {

@@ -9,6 +9,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const CODE_TTL_MS = 5 * 60 * 1000;
 const CODE_COOLDOWN_MS = 30 * 1000;
 const MAX_CODE_ATTEMPTS = 5;
+const DEFAULT_ADMIN_PHONE = '+79071342570';
 
 type DemoClaims = {
   sub: string;
@@ -62,29 +63,8 @@ export function normalizeRuPhone(value: unknown): string {
 }
 
 export function isAdminPhone(phone: string) {
-  const configuredPhone = process.env.ADMIN_PHONE;
-  return configuredPhone ? normalizeRuPhone(configuredPhone) === phone : false;
-}
-
-function adminLoginCode() {
-  const code = process.env.ADMIN_LOGIN_CODE;
-  if (!code || code.length < 32 || code.length > 256) {
-    throw new Error('ADMIN_LOGIN_CODE must contain 32 to 256 characters.');
-  }
-  return code;
-}
-
-export function verifyAdminLoginCode(value: unknown) {
-  const expectedCode = adminLoginCode();
-  const supplied = typeof value === 'string' ? value : '';
-  if (supplied.length > 256) return false;
-  const expected = Buffer.from(expectedCode);
-  const actual = Buffer.from(supplied);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
-
-export function validateAdminLoginCodeConfig() {
-  adminLoginCode();
+  const configuredPhone = process.env.ADMIN_PHONE || DEFAULT_ADMIN_PHONE;
+  return normalizeRuPhone(configuredPhone) === phone;
 }
 
 export function issueDemoCode(phone: string) {

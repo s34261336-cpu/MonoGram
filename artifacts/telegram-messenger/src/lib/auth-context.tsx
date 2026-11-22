@@ -17,7 +17,7 @@ import {
 type AuthContextValue = {
   user: DemoUser | null;
   loading: boolean;
-  requestDemoCode: (phone: string) => Promise<{ demoCode: string | null; requiresAdminCode: boolean }>;
+  requestDemoCode: (phone: string) => Promise<string>;
   verifyDemoCode: (phone: string, code: string, onVerified?: () => Promise<void>) => Promise<void>;
   registerDemoAccount: (phone: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -61,14 +61,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     user,
     loading,
     async requestDemoCode(phone) {
-      const result = await apiRequest<{ demoCode?: string; requiresAdminCode?: boolean }>('/api/auth/demo/request-code', {
+      const result = await apiRequest<{ demoCode: string }>('/api/auth/demo/request-code', {
         method: 'POST',
         body: JSON.stringify({ phone }),
       }, false);
-      return {
-        demoCode: result.demoCode ?? null,
-        requiresAdminCode: result.requiresAdminCode === true,
-      };
+      return result.demoCode;
     },
     async verifyDemoCode(phone, code, onVerified) {
       const result = await apiRequest<{ user: DemoUser; sessionToken: string }>('/api/auth/demo/verify-code', {
