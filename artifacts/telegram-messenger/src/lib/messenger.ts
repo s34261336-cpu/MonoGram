@@ -7,6 +7,7 @@ export type Profile = {
   displayName: string;
   bio: string;
   avatarUrl: string | null;
+  lastSeen: string | null;
 };
 
 export type DirectMessage = {

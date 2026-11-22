@@ -13,10 +13,11 @@ type ProfileRow = {
   display_name: string;
   bio: string | null;
   avatar_url: string | null;
+  last_seen: string | null;
 };
 
 const router: IRouter = Router();
-const profileFields = 'id, public_id, username, display_name, bio, avatar_url';
+const profileFields = 'id, public_id, username, display_name, bio, avatar_url, last_seen';
 const imageMessagePrefix = 'MONOGRAM_IMAGE_V1:';
 const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const maxImageBytes = 10 * 1024 * 1024;
@@ -44,6 +45,7 @@ function toProfile(row: ProfileRow) {
     displayName: row.display_name,
     bio: row.bio ?? '',
     avatarUrl: row.avatar_url,
+    lastSeen: row.last_seen,
   };
 }
 

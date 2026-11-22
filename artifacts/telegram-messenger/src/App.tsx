@@ -19,7 +19,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { ArrowLeft, ArrowRight, AtSign, Bell, BriefcaseBusiness, Camera, Check, CheckCheck, ChevronDown, CircleUserRound, Compass, Copy, Crown, Database, Gift, Hash, ImagePlus, Languages, Laptop, LoaderCircle, LockKeyhole, LogOut, MessageCircle, MoreHorizontal, MoreVertical, PenLine, Phone, Plus, Search, Send, Settings2, Shield, Sparkles, Star, UserRound, Wallet, X } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
 
@@ -71,6 +71,20 @@ const chatNameColors: Record<ChatNameColor, string> = {
 };
 const dateLabel = (value?: string) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: ru }) : '';
 const clock = (value?: string) => value ? format(new Date(value), 'HH:mm') : '';
+const isUserOnline = (lastSeen: Profile['lastSeen']) => {
+  if (!lastSeen) return false;
+  const difference = Date.now() - new Date(lastSeen).getTime();
+  return Number.isFinite(difference) && difference >= 0 && difference < 60_000;
+};
+const userPresenceLabel = (lastSeen: Profile['lastSeen']) => {
+  if (!lastSeen) return 'не в сети';
+  const date = new Date(lastSeen);
+  if (!Number.isFinite(date.getTime())) return 'не в сети';
+  if (isUserOnline(lastSeen)) return 'в сети';
+  if (isYesterday(date)) return `был(а) вчера в ${clock(lastSeen)}`;
+  if (isToday(date)) return `был(а) в ${clock(lastSeen)}`;
+  return `был(а) ${format(date, 'd MMM', { locale: ru }).replace(/\.$/, '')} в ${clock(lastSeen)}`;
+};
 const initials = (name?: string) => Array.from((name || '?').trim())[0]?.toUpperCase() || '?';
 const canSearchUsers = (value: string) => value.length >= 2 || /^\d+$/.test(value);
 const profileIdentifier = (profile: Pick<Profile, 'username' | 'publicId'>) => (
@@ -458,7 +472,7 @@ function ChatWorkspace() {
   const messagesQuery = useMessages(id, user?.id || '');
   const profileQuery = useProfile(user?.id || '');
   const { preferences } = useUserPreferences(user?.id || '');
-  const presence = usePresence(user?.id, preferences.showOnlineStatus);
+  usePresence(user?.id, preferences.showOnlineStatus);
   const chats = chatsQuery.data || [];
   const current = chats.find(c => c.id === id);
   const sendMessage = useSendMessage(user?.id || '');
@@ -603,7 +617,10 @@ function ChatWorkspace() {
             const isOwnMessage = lastMessage?.authorId === user?.id;
             const isRead = lastMessage?.isRead === true || Boolean(lastMessage?.readAt);
             return <button className={`conversation-row ${id === chat.id ? 'row-selected' : ''}`} key={chat.id} onClick={() => { markRead(chat.id); setPath(`/chat/${encodeURIComponent(chat.id)}`); }} data-testid={`conversation-${chat.id}`}>
-              <Avatar profile={chat.person} />
+              <span className="conversation-avatar">
+                <Avatar profile={chat.person} />
+                {isUserOnline(chat.person.lastSeen) && <span className="presence-dot" aria-label="В сети" title="В сети" />}
+              </span>
               <span className="conversation-row-copy">
                 <span className="row-title"><span className="row-name">{chat.person.displayName}</span><time>{clock(lastMessage?.createdAt)}</time></span>
                 <span className="row-bottom">
@@ -658,7 +675,7 @@ function ChatWorkspace() {
     </aside>
     <section className="chat-stage">
       {current ? <>
-         <header className="chat-topbar glass-surface"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={presence.onlineUserIds.includes(current.person.id) ? 'presence-online' : ''}>{presence.onlineUserIds.includes(current.person.id) ? 'В сети' : profileIdentifier(current.person)}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>{profileIdentifier(current.person)}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
+         <header className="chat-topbar glass-surface"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={isUserOnline(current.person.lastSeen) ? 'presence-online' : ''}>{userPresenceLabel(current.person.lastSeen)}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>{profileIdentifier(current.person)}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
          <div className="message-area" ref={messageAreaRef}>
           {messagesQuery.isLoading ? <div className="message-skeleton"><i/><i/><i/></div> : messagesQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Переписка сохранена. Попробуйте ещё раз." action="Повторить" onAction={() => messagesQuery.refetch()} /> : messages.length === 0 ? <div className="chat-welcome"><span className="welcome-symbol"><MessageCircle size={23}/></span><span className="overline">ЛИЧНАЯ ПЕРЕПИСКА</span><h2>Поздоровайтесь с {current.person.displayName.split(' ')[0]}.</h2><p>Эту переписку видите только вы и собеседник.</p></div> : <div className="message-thread">{messages.map((message: DirectMessage) => {
             const mine = message.authorId === user?.id;

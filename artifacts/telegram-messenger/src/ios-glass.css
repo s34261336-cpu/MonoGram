@@ -327,6 +327,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .conversation-row:hover { background: var(--hover); }
 .conversation-row:active { transform: scale(.985); background: var(--tint); }
 .row-selected, .row-selected:hover { background: var(--tint); border: 0; }
+.conversation-avatar { position: relative; flex: 0 0 auto; display: block; }
+.presence-dot {
+  position: absolute; right: 1px; bottom: 1px; width: 13px; height: 13px;
+  border: 2px solid var(--bg-edge); border-radius: 50%; background: var(--green);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+}
 .conversation-row-copy { min-width: 0; flex: 1; display: grid; gap: 4px; }
 .conversation-row-copy > * { min-width: 0; }
 .row-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -382,7 +388,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chat-top-person { min-width: 0; display: grid; gap: 2px; }
 .chat-top-person b { font-size: 17px; font-weight: 600; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-top-person span { font-size: 13px; color: var(--text-2); }
-.chat-top-person span.presence-online { color: var(--blue); }
+.chat-top-person span.presence-online { color: var(--green); }
 .conversation-details { right: 4px; top: calc(100% + 8px); min-width: 250px; padding: 14px 16px; gap: 4px; }
 .conversation-details b { font-size: 17px; }
 .conversation-details span, .conversation-details small { color: var(--text-2); font-size: 14px; display: flex; align-items: center; gap: 6px; }
@@ -638,7 +644,7 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
   background:
     radial-gradient(ellipse 105% 60% at 50% -12%, rgba(255, 255, 255, .3), transparent 70%),
     linear-gradient(145deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .045)),
-    var(--glass);
+    var(--glass-strong);
   border: 1px solid rgba(255, 255, 255, .3);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, .56),
