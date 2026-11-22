@@ -30,7 +30,7 @@ const wallpaperArtwork: Record<ChatWallpaper, string> = {
   green: new URL('./assets/chat-wallpapers/night.svg', import.meta.url).href,
   warm: new URL('./assets/chat-wallpapers/doodles.svg', import.meta.url).href,
 };
-const welcomeArtwork = new URL('./assets/fast.jpg', import.meta.url).href;
+const welcomeArtwork = new URL('./assets/chick.png', import.meta.url).href;
 const chatWallpaperOptions: { value: ChatWallpaper; label: string; background: string }[] = [
   { value: 'default', label: 'Лес', background: `linear-gradient(145deg, rgba(220,234,248,.68), rgba(225,238,233,.68)), url("${wallpaperArtwork.default}")` },
   { value: 'blue', label: 'Цветы', background: `linear-gradient(145deg, rgba(191,220,244,.68), rgba(200,216,242,.68)), url("${wallpaperArtwork.blue}")` },
