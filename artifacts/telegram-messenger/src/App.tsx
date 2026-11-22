@@ -30,6 +30,7 @@ const wallpaperArtwork: Record<ChatWallpaper, string> = {
   green: new URL('./assets/chat-wallpapers/night.svg', import.meta.url).href,
   warm: new URL('./assets/chat-wallpapers/doodles.svg', import.meta.url).href,
 };
+const welcomeArtwork = new URL('./assets/fast.jpg', import.meta.url).href;
 const chatWallpaperOptions: { value: ChatWallpaper; label: string; background: string }[] = [
   { value: 'default', label: 'Лес', background: `linear-gradient(145deg, rgba(220,234,248,.68), rgba(225,238,233,.68)), url("${wallpaperArtwork.default}")` },
   { value: 'blue', label: 'Цветы', background: `linear-gradient(145deg, rgba(191,220,244,.68), rgba(200,216,242,.68)), url("${wallpaperArtwork.blue}")` },
@@ -642,10 +643,15 @@ function ChatWorkspace() {
             </span>
           </button>)}
           {filtered.length === 0 && chatUserResults.length === 0 && !(chatSearchReady && (chatUserSearch.isLoading || chatUserSearch.isError)) && <div className="sidebar-empty">
-            <div className="empty-mark"><MessageCircle size={19}/></div>
-            <b>{search ? 'Ничего не найдено' : 'Пока здесь тихо'}</b>
-            <p>{search ? 'Попробуйте другое имя или числовой ID.' : 'Найдите человека по имени пользователя или ID, чтобы начать переписку.'}</p>
-            {!search && <button className="text-action" onClick={() => setNewChat(true)} data-testid="button-start-first-chat">Найти человека <ArrowLeft size={14}/></button>}
+            {search ? <>
+              <div className="empty-mark"><MessageCircle size={19}/></div>
+              <b>Ничего не найдено</b>
+              <p>Попробуйте другое имя или числовой ID.</p>
+            </> : <>
+              <img className="welcome-empty-image welcome-empty-image--sidebar" src={welcomeArtwork} alt="Цыпленок в скорлупе"/>
+              <b>Добро пожаловать</b>
+              <p>Чтобы начать общение, нажмите на значок в правом нижнем углу</p>
+            </>}
           </div>}
         </>}
       </div>
@@ -670,7 +676,11 @@ function ChatWorkspace() {
            </div>
          </form>
         {error && <div className="inline-error" role="alert">{error}<button onClick={() => void send()} data-testid="button-retry-message">Попробовать снова</button></div>}
-      </> : <div className="conversation-empty"><div className="empty-art"><div className="art-ring ring-a"/><div className="art-ring ring-b"/><span><MessageCircle size={28}/></span></div><span className="overline">MONOGRAM / ЛИЧНЫЕ СООБЩЕНИЯ</span><h2>Место для важных разговоров.</h2><p>Выберите переписку или найдите человека по имени пользователя.</p><button className="primary-button" onClick={() => setNewChat(true)} data-testid="button-find-person"><Plus size={16}/> Найти человека</button><div className="empty-caption">Здесь нет примеров переписок. Начните с первого сообщения.</div></div>}
+      </> : <div className="conversation-empty">
+        <img className="welcome-empty-image" src={welcomeArtwork} alt="Цыпленок в скорлупе"/>
+        <h2>Добро пожаловать</h2>
+        <p>Чтобы начать общение, нажмите на значок в правом нижнем углу</p>
+      </div>}
     </section>
     <button className="chat-compose-fab" type="button" onClick={() => setNewChat(true)} aria-label="Написать сообщение" title="Новое сообщение" data-testid="button-new-chat">
       <PenLine size={22} />

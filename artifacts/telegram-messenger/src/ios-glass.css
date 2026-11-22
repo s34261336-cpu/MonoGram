@@ -413,8 +413,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .inline-error button { margin-left: 8px; color: var(--blue); background: none; border: 0; font-weight: 600; text-decoration: none; }
 
 .conversation-empty { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; text-align: center; }
+.welcome-empty-image { width: 120px; height: 120px; display: block; object-fit: contain; background: transparent; border-radius: 0; }
+.welcome-empty-image--sidebar { width: 96px; height: 96px; margin-bottom: 12px; }
 .conversation-empty h2 { margin: 18px 0 8px; font-size: 26px; font-weight: 700; color: var(--text); }
-.conversation-empty > p { margin: 0 0 22px; font-size: 16px; color: var(--text-2); }
+.conversation-empty > p { max-width: 520px; margin: 0; font-size: 16px; line-height: 1.45; color: var(--text-2); }
 .empty-caption { position: absolute; bottom: 22px; font-size: 13px; color: var(--text-3); }
 .empty-art > span { color: #fff; background: linear-gradient(155deg, #55adf8, #2580d8); box-shadow: 0 14px 40px rgba(38, 128, 216, .35); }
 .art-ring { border-color: rgba(51, 144, 236, .2); }
