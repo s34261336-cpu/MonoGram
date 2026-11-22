@@ -1343,12 +1343,16 @@ html, body { background-color: var(--bg-edge); color: var(--text); }
   box-shadow: inset 0 1px rgba(255,255,255,.35);
 }
 
-.chat-stage .message-area {
+.chat-stage {
   background-image: var(--chat-wallpaper, none);
   background-size: cover, 320px 260px;
   background-position: center, center;
   background-repeat: no-repeat, repeat;
   transition: background .2s ease;
+}
+
+.chat-stage .message-area {
+  background: transparent;
 }
 
 .message-bubble p {
