@@ -7,8 +7,15 @@ export type UserPreferences = {
   showOnlineStatus: boolean;
   desktopNotifications: boolean;
   showNotificationText: boolean;
+  chatMessageSize: number;
+  chatWallpaper: ChatWallpaper;
+  chatAccent: ChatAccent;
+  chatNameColor: ChatNameColor;
 };
 
+export type ChatWallpaper = 'default' | 'blue' | 'green' | 'warm';
+export type ChatAccent = 'blue' | 'violet' | 'green' | 'amber';
+export type ChatNameColor = 'default' | 'blue' | 'violet' | 'green' | 'rose';
 export type UserPreferenceKey = keyof UserPreferences;
 
 const defaults: UserPreferences = {
@@ -18,10 +25,17 @@ const defaults: UserPreferences = {
   showOnlineStatus: true,
   desktopNotifications: false,
   showNotificationText: true,
+  chatMessageSize: 16,
+  chatWallpaper: 'default',
+  chatAccent: 'blue',
+  chatNameColor: 'default',
 };
 
 const eventName = 'monogram:user-preferences-changed';
 const storageKey = (userId: string) => `monogram:user-preferences:${userId}`;
+const chatWallpapers: ChatWallpaper[] = ['default', 'blue', 'green', 'warm'];
+const chatAccents: ChatAccent[] = ['blue', 'violet', 'green', 'amber'];
+const chatNameColors: ChatNameColor[] = ['default', 'blue', 'violet', 'green', 'rose'];
 
 export function readUserPreferences(userId: string): UserPreferences {
   if (!userId || typeof window === 'undefined') return defaults;
@@ -34,6 +48,12 @@ export function readUserPreferences(userId: string): UserPreferences {
       showOnlineStatus: typeof parsed.showOnlineStatus === 'boolean' ? parsed.showOnlineStatus : defaults.showOnlineStatus,
       desktopNotifications: typeof parsed.desktopNotifications === 'boolean' ? parsed.desktopNotifications : defaults.desktopNotifications,
       showNotificationText: typeof parsed.showNotificationText === 'boolean' ? parsed.showNotificationText : defaults.showNotificationText,
+      chatMessageSize: typeof parsed.chatMessageSize === 'number' && Number.isFinite(parsed.chatMessageSize)
+        ? Math.min(24, Math.max(14, Math.round(parsed.chatMessageSize)))
+        : defaults.chatMessageSize,
+      chatWallpaper: parsed.chatWallpaper && chatWallpapers.includes(parsed.chatWallpaper) ? parsed.chatWallpaper : defaults.chatWallpaper,
+      chatAccent: parsed.chatAccent && chatAccents.includes(parsed.chatAccent) ? parsed.chatAccent : defaults.chatAccent,
+      chatNameColor: parsed.chatNameColor && chatNameColors.includes(parsed.chatNameColor) ? parsed.chatNameColor : defaults.chatNameColor,
     };
   } catch {
     return defaults;
@@ -63,7 +83,7 @@ export function useUserPreferences(userId: string) {
     };
   }, [userId]);
 
-  const updatePreference = useCallback((key: UserPreferenceKey, value: boolean) => {
+  const updatePreference = useCallback(<K extends UserPreferenceKey>(key: K, value: UserPreferences[K]) => {
     if (!userId || typeof window === 'undefined') return;
     const next = { ...readUserPreferences(userId), [key]: value };
     try {

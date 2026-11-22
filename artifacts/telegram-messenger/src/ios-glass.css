@@ -1218,6 +1218,124 @@ html, body { background-color: var(--bg-edge); color: var(--text); }
   opacity: .65;
 }
 
+.mono-settings-range {
+  display: grid;
+  gap: 12px;
+  padding: 12px 0 8px;
+  border-top: 1px solid var(--sep);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.mono-settings-range > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mono-settings-range b {
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
+
+.mono-settings-range input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+.mono-settings-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  padding: 10px 0 5px;
+  border-top: 1px solid var(--sep);
+}
+
+.mono-settings-choice {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 7px 4px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: var(--text-2);
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mono-settings-choice[aria-pressed="true"] {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--tint);
+}
+
+.mono-settings-wallpaper-swatch {
+  width: 100%;
+  height: 46px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+}
+
+.mono-settings-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0 7px;
+  border-top: 1px solid var(--sep);
+}
+
+.mono-settings-color-choice {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mono-settings-color-choice[aria-pressed="true"] {
+  border-color: var(--blue);
+}
+
+.mono-settings-color-choice > span {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.mono-settings-accent-swatch {
+  width: 100%;
+  height: 30px;
+  border-radius: 10px;
+  box-shadow: inset 0 1px rgba(255,255,255,.35);
+}
+
+.chat-stage .message-area {
+  background: var(--chat-wallpaper, transparent);
+  transition: background .2s ease;
+}
+
+.message-bubble p {
+  font-size: var(--chat-message-size, 16px);
+}
+
+.message-row.mine .message-bubble {
+  background: var(--chat-outgoing-bubble, linear-gradient(160deg, #4aa6f6, #2d84de));
+}
+
+.workspace .chat-top-person b,
+.workspace .row-name,
+.workspace .conversation-details > b {
+  color: var(--chat-name-color, var(--text));
+}
+
 .mono-settings-explainer,
 .mono-settings-feedback {
   margin: 12px 0 8px;

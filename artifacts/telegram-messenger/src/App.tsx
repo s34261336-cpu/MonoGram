@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, Router as WouterRouter, Link, useLocation, useParams } from 'wouter';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { useChats, useChannels, useCreateChannel, useCreatePost, useJoinChannel, useMessages, usePosts, useProfile, useSaveProfile, useSendMessage, useSendStars, useStartConversation, useUserSearch, useWallet } from '@/hooks/use-messenger';
 import { usePresence } from '@/hooks/use-presence';
 import { useChatReadState } from '@/hooks/use-chat-read-state';
-import { useUserPreferences } from '@/hooks/use-user-preferences';
+import { useUserPreferences, type ChatAccent, type ChatNameColor, type ChatWallpaper } from '@/hooks/use-user-preferences';
 import { uploadMessagePhoto, type Channel, type ChannelPost, type Conversation, type DirectMessage, type Profile } from '@/lib/messenger';
 import { apiBlobRequest, apiRequest } from '@/lib/api';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -24,6 +24,44 @@ import { ru } from 'date-fns/locale';
 import './auth-screen.css';
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 12_000, retry: 1, refetchOnWindowFocus: true } } });
+const chatWallpaperOptions: { value: ChatWallpaper; label: string; background: string }[] = [
+  { value: 'default', label: 'Стандартные', background: 'linear-gradient(145deg, #dceaf8, #e1eee9)' },
+  { value: 'blue', label: 'Голубые', background: 'linear-gradient(145deg, #bfdcf4, #c8d8f2)' },
+  { value: 'green', label: 'Зелёные', background: 'linear-gradient(145deg, #c5e8d8, #c4e3e7)' },
+  { value: 'warm', label: 'Тёплые', background: 'linear-gradient(145deg, #f1d8c6, #e8d4e8)' },
+];
+const chatAccentOptions: { value: ChatAccent; label: string; background: string }[] = [
+  { value: 'blue', label: 'Синяя', background: 'linear-gradient(145deg, #55adf8, #2580d8)' },
+  { value: 'violet', label: 'Фиолетовая', background: 'linear-gradient(145deg, #ae8bfa, #7955d9)' },
+  { value: 'green', label: 'Зелёная', background: 'linear-gradient(145deg, #5bc995, #279d75)' },
+  { value: 'amber', label: 'Янтарная', background: 'linear-gradient(145deg, #f3b65e, #dc8641)' },
+];
+const chatNameColorOptions: { value: ChatNameColor; label: string; color: string }[] = [
+  { value: 'default', label: 'Стандартный', color: '#718097' },
+  { value: 'blue', label: 'Голубой', color: '#3390ec' },
+  { value: 'violet', label: 'Фиолетовый', color: '#8b65d8' },
+  { value: 'green', label: 'Зелёный', color: '#2d9c72' },
+  { value: 'rose', label: 'Розовый', color: '#d66082' },
+];
+const chatWallpaperBackgrounds: Record<ChatWallpaper, string> = {
+  default: 'var(--chat-bg)',
+  blue: 'linear-gradient(160deg, #d5e9fb, #dce4f6 55%, #cfe7ed)',
+  green: 'linear-gradient(160deg, #d3eee2, #d8ece7 55%, #d2e8ef)',
+  warm: 'linear-gradient(160deg, #f3e1d3, #f0e2e8 55%, #eadbf0)',
+};
+const chatAccentBackgrounds: Record<ChatAccent, string> = {
+  blue: 'linear-gradient(145deg, #55adf8, #2580d8)',
+  violet: 'linear-gradient(145deg, #ae8bfa, #7955d9)',
+  green: 'linear-gradient(145deg, #5bc995, #279d75)',
+  amber: 'linear-gradient(145deg, #f3b65e, #dc8641)',
+};
+const chatNameColors: Record<ChatNameColor, string> = {
+  default: 'var(--text)',
+  blue: '#3390ec',
+  violet: '#8b65d8',
+  green: '#2d9c72',
+  rose: '#d66082',
+};
 const dateLabel = (value?: string) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: ru }) : '';
 const clock = (value?: string) => value ? format(new Date(value), 'HH:mm') : '';
 const initials = (name?: string) => Array.from((name || '?').trim())[0]?.toUpperCase() || '?';
@@ -387,7 +425,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [chatsQuery.data, path, preferences.desktopNotifications, preferences.showNotificationText, setPath, user?.id]);
   return <UnreadChatsCountContext.Provider value={setUnreadChatsCount}>
-    <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`}>
+    <div className={`workspace ${inConversation ? 'workspace--chat-open' : ''}`} style={{
+      '--chat-message-size': `${preferences.chatMessageSize}px`,
+      '--chat-wallpaper': chatWallpaperBackgrounds[preferences.chatWallpaper],
+      '--chat-outgoing-bubble': chatAccentBackgrounds[preferences.chatAccent],
+      '--chat-name-color': preferences.chatNameColor === 'default' ? 'var(--text)' : chatNameColors[preferences.chatNameColor],
+    } as CSSProperties}>
       <div className="workspace-main">{children}</div>
       <Navigation profile={profile} hidden={inConversation || path === '/profile/edit' || path === '/profile/username'} unreadChatsCount={unreadChatsCount} showUnreadBadge={preferences.showUnreadBadge} />
     </div>
@@ -1466,6 +1509,68 @@ function SettingsPage() {
         break;
       case 'chats':
         content = <>
+          <section className="mono-settings-panel">
+            <h2>Размер текста сообщений</h2>
+            <label className="mono-settings-range">
+              <span><span>Размер текста</span><b>{preferences.chatMessageSize}px</b></span>
+              <input
+                type="range"
+                min="14"
+                max="24"
+                step="1"
+                value={preferences.chatMessageSize}
+                onChange={event => updatePreference('chatMessageSize', Number(event.currentTarget.value))}
+                aria-label="Размер текста сообщений"
+                data-testid="range-chat-message-size"
+              />
+            </label>
+          </section>
+          <section className="mono-settings-panel">
+            <h2>Обои переписки</h2>
+            <div className="mono-settings-choice-grid" aria-label="Выбор обоев переписки">
+              {chatWallpaperOptions.map(option => <button
+                className="mono-settings-choice"
+                type="button"
+                key={option.value}
+                aria-pressed={preferences.chatWallpaper === option.value}
+                onClick={() => updatePreference('chatWallpaper', option.value)}
+                data-testid={`chat-wallpaper-${option.value}`}
+              >
+                <span className="mono-settings-wallpaper-swatch" style={{ background: option.background }} aria-hidden="true"/>
+                <span>{option.label}</span>
+              </button>)}
+            </div>
+          </section>
+          <section className="mono-settings-panel">
+            <h2>Цвет имён</h2>
+            <div className="mono-settings-color-options" aria-label="Цвет имён собеседников">
+              {chatNameColorOptions.map(option => <button
+                className="mono-settings-color-choice"
+                type="button"
+                key={option.value}
+                aria-label={option.label}
+                aria-pressed={preferences.chatNameColor === option.value}
+                onClick={() => updatePreference('chatNameColor', option.value)}
+                data-testid={`chat-name-color-${option.value}`}
+              ><span style={{ background: option.color }} aria-hidden="true"/></button>)}
+            </div>
+          </section>
+          <section className="mono-settings-panel">
+            <h2>Цветовая тема сообщений</h2>
+            <div className="mono-settings-choice-grid mono-settings-accent-grid" aria-label="Цветовая тема исходящих сообщений">
+              {chatAccentOptions.map(option => <button
+                className="mono-settings-choice"
+                type="button"
+                key={option.value}
+                aria-pressed={preferences.chatAccent === option.value}
+                onClick={() => updatePreference('chatAccent', option.value)}
+                data-testid={`chat-accent-${option.value}`}
+              >
+                <span className="mono-settings-accent-swatch" style={{ background: option.background }} aria-hidden="true"/>
+                <span>{option.label}</span>
+              </button>)}
+            </div>
+          </section>
           <section className="mono-settings-panel">
             <h2>Список чатов</h2>
             <SettingsSwitch label="Предпросмотр сообщений" description="Показывать текст последнего сообщения в списке чатов" checked={preferences.showMessagePreviews} onChange={value => updatePreference('showMessagePreviews', value)} testId="switch-message-previews"/>
