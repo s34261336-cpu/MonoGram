@@ -225,18 +225,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   position: sticky; top: 0; z-index: 20;
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
   min-height: 72px; margin: 0 -16px; padding: calc(10px + var(--safe-t)) 16px 10px;
-  background: var(--glass); border: 0; border-bottom: 1px solid var(--glass-border);
-  box-shadow: var(--glass-edge);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  background: transparent; border: 0; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 /* «мягкий край»: контент плавно уходит под размытие */
 .mono-screen-header::before,
 .page-header::before {
-  content: ''; position: absolute; inset: 0 0 -14px; z-index: -1; pointer-events: none;
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg-edge) 78%, transparent), transparent);
-  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent);
-  mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  content: none;
 }
 .mono-screen-header h1, .mono-screen-header h2, .tg-account-header h1, .page-header h1 {
   margin: 0; grid-column: 2; justify-self: center; text-align: center;
@@ -300,8 +295,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chat-sidebar-head {
   position: relative; display: flex; align-items: center; justify-content: flex-end;
   min-height: 56px; padding: 0; margin-bottom: 10px;
-  background: var(--glass); border-bottom: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  background: transparent; border: 0; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 .chat-sidebar-head h1 {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0;
@@ -503,8 +498,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   position: sticky; top: 0; z-index: 20;
   display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px;
   min-height: 72px; margin: 0 -16px; padding: calc(10px + var(--safe-t)) 16px 10px;
-  background: var(--glass); border-bottom: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  background: transparent; border: 0; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 .tg-account-header h1 { grid-column: 2; }
 .tg-account-form { display: grid; gap: 4px; }
@@ -1636,10 +1631,7 @@ html, body { background-color: var(--bg-edge); color: var(--text); }
 :is(.primary-button, .outline-button, .chat-menu-button, .mono-screen-header-actions > button,
   .tg-account-back, .tg-account-save, .mobile-back, .quiet-icon, .chat-compose-fab,
   .send-circle, .composer-attach, .composer-image-preview button, .tg-profile-camera,
-  .tg-profile-actions button, .dialog-close, .mono-settings-detail-header > button,
-  .search-control button, .mono-settings-search button, .mono-contact-search button,
-  .chat-header-menu button, .mono-screen-menu button, .tg-profile-bio-menu button,
-  .tg-profile-username-menu button, .user-result) {
+  .tg-profile-actions button, .dialog-close, .mono-settings-detail-header > button) {
   border: 1px solid rgba(255, 255, 255, .38);
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
