@@ -46,9 +46,11 @@ create table if not exists public.dm_members (
   conversation_id uuid not null references public.dm_conversations(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   joined_at timestamptz not null default now(),
+  last_read_at timestamptz,
   primary key (conversation_id, user_id)
 );
 
+alter table public.dm_members add column if not exists last_read_at timestamptz;
 create index if not exists dm_members_user_idx on public.dm_members(user_id, conversation_id);
 
 create table if not exists public.dm_messages (

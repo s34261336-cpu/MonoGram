@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Conversation } from '@/lib/messenger';
+import { apiRequest } from '@/lib/api';
 
 type ReadMarkers = Record<string, string>;
 
@@ -49,6 +50,9 @@ export function useChatReadState(userId: string) {
       // Keep the current view usable when browser storage is unavailable.
     }
     window.dispatchEvent(new Event(readStateEvent));
+    void apiRequest(`/api/messenger/conversations/${encodeURIComponent(conversationId)}/read`, {
+      method: 'POST',
+    }).catch(() => undefined);
   }, [userId]);
 
   const unreadCountFor = useCallback((conversation: Conversation) => {

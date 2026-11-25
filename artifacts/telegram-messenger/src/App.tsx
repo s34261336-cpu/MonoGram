@@ -77,9 +77,9 @@ const isUserOnline = (lastSeen: Profile['lastSeen']) => {
   return Number.isFinite(difference) && difference >= 0 && difference < 60_000;
 };
 const userPresenceLabel = (lastSeen: Profile['lastSeen']) => {
-  if (!lastSeen) return 'не в сети';
+  if (!lastSeen) return 'был(а) недавно';
   const date = new Date(lastSeen);
-  if (!Number.isFinite(date.getTime())) return 'не в сети';
+  if (!Number.isFinite(date.getTime())) return 'был(а) недавно';
   if (isUserOnline(lastSeen)) return 'в сети';
   if (isYesterday(date)) return `был(а) вчера в ${clock(lastSeen)}`;
   if (isToday(date)) return `был(а) в ${clock(lastSeen)}`;

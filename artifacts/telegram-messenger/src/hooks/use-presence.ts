@@ -13,7 +13,7 @@ export function usePresence(userId?: string | null, enabled = true): void {
     };
 
     sendHeartbeat();
-    const heartbeatTimer = setInterval(sendHeartbeat, 30_000);
+    const heartbeatTimer = setInterval(sendHeartbeat, 10_000);
     return () => clearInterval(heartbeatTimer);
   }, [enabled, userId]);
 }

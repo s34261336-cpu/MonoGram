@@ -290,7 +290,7 @@ router.get('/chats', handleRoute(async (req, res) => {
   }
 
   const [membersResult, messagesResult] = await Promise.all([
-    supabaseAdmin.from('dm_members').select('conversation_id, user_id').in('conversation_id', conversationIds),
+    supabaseAdmin.from('dm_members').select('conversation_id, user_id, last_read_at').in('conversation_id', conversationIds),
     supabaseAdmin.from('dm_messages')
       .select('id, conversation_id, author_id, content, created_at')
       .in('conversation_id', conversationIds)
@@ -301,6 +301,9 @@ router.get('/chats', handleRoute(async (req, res) => {
   checkError(messagesResult.error);
   const members = membersResult.data ?? [];
   const personIds = [...new Set(members.filter(row => row.user_id !== id).map(row => row.user_id))];
+  const peerLastReadByConversation = new Map(
+    members.filter(row => row.user_id !== id).map(row => [row.conversation_id, row.last_read_at]),
+  );
   if (!personIds.length) {
     res.json([]);
     return;
@@ -322,6 +325,10 @@ router.get('/chats', handleRoute(async (req, res) => {
     if (latestByConversation.has(row.conversation_id)) continue;
     const author = row.author_id === id ? null : profiles.get(row.author_id);
     const decoded = decodeMessageContent(row.content);
+    const peerLastReadAt = peerLastReadByConversation.get(row.conversation_id);
+    const isRead = row.author_id === id
+      && typeof peerLastReadAt === 'string'
+      && Date.parse(peerLastReadAt) >= Date.parse(row.created_at);
     latestByConversation.set(row.conversation_id, {
       id: row.id,
       conversationId: row.conversation_id,
@@ -331,6 +338,8 @@ router.get('/chats', handleRoute(async (req, res) => {
       content: decoded.content,
       imageUrl: imageUrlFor(row.id, decoded.imagePath),
       createdAt: row.created_at,
+      isRead,
+      readAt: isRead ? peerLastReadAt : null,
     });
   }
   res.json(conversationIds
@@ -354,6 +363,13 @@ router.get('/messages', handleRoute(async (req, res) => {
     .limit(500);
   checkError(error);
   const messages = rows ?? [];
+  const { data: peerMembership, error: peerError } = await supabaseAdmin.from('dm_members')
+    .select('last_read_at')
+    .eq('conversation_id', conversationId)
+    .neq('user_id', id)
+    .maybeSingle();
+  checkError(peerError);
+  const peerLastReadAt = peerMembership?.last_read_at;
   const authorIds = [...new Set(messages.map(row => row.author_id))];
   const { data: profiles, error: profilesError } = authorIds.length
     ? await supabaseAdmin.from('profiles').select(profileFields).in('id', authorIds)
@@ -372,8 +388,28 @@ router.get('/messages', handleRoute(async (req, res) => {
       content: decoded.content,
       imageUrl: imageUrlFor(row.id, decoded.imagePath),
       createdAt: row.created_at,
+      isRead: row.author_id === id
+        && typeof peerLastReadAt === 'string'
+        && Date.parse(peerLastReadAt) >= Date.parse(row.created_at),
+      readAt: row.author_id === id
+        && typeof peerLastReadAt === 'string'
+        && Date.parse(peerLastReadAt) >= Date.parse(row.created_at)
+        ? peerLastReadAt
+        : null,
     };
   }));
+}));
+
+router.post('/conversations/:conversationId/read', handleRoute(async (req, res) => {
+  const id = userId(req);
+  const conversationId = String(req.params.conversationId || '');
+  if (!conversationId || !(await isMember(conversationId, id))) throw apiError('Переписка не найдена.', 404);
+  const { error } = await supabaseAdmin.from('dm_members')
+    .update({ last_read_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', id);
+  checkError(error);
+  res.json({ ok: true });
 }));
 
 router.get('/messages/:messageId/image', handleRoute(async (req, res) => {

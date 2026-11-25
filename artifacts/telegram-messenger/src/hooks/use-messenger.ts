@@ -49,7 +49,7 @@ export function useChats(userId: string) {
     queryKey: messengerKeys.chats(userId),
     queryFn: () => getConversations(userId),
     enabled: Boolean(userId),
-    refetchInterval: 8_000,
+    refetchInterval: 5_000,
   });
 }
 
