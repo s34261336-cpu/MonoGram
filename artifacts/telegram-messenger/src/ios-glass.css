@@ -1222,17 +1222,211 @@ html, body { background-color: var(--bg-edge); color: var(--text); }
 }
 
 .mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-detail-content {
-  gap: 8px;
+  gap: 14px;
 }
 
 .mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-panel {
-  padding: 7px 13px;
-  border-radius: 18px;
+  padding: 16px 18px;
+  border-radius: 24px;
 }
 
 .mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-panel h2 {
-  margin: 4px 0;
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 17px;
+}
+
+.mono-chat-preview {
+  min-height: 232px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  background-size: cover, 55px 45px;
+  background-repeat: no-repeat, repeat;
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+}
+
+.mono-chat-preview__header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.mono-chat-preview__avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  color: var(--text);
+  background: var(--glass-card);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mono-chat-preview__header > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.mono-chat-preview__header b {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.mono-chat-preview__header small {
+  color: var(--green);
+  font-size: 11px;
+}
+
+.mono-chat-preview__label {
+  margin-left: auto;
+  color: var(--text-2);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.mono-chat-preview__messages {
+  display: grid;
+  gap: 8px;
+}
+
+.mono-chat-preview__bubble {
+  width: fit-content;
+  max-width: 82%;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 15px 15px 15px 5px;
+  color: var(--text);
+  background: var(--glass-card);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: var(--glass-edge);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.mono-chat-preview__bubble--outgoing {
+  justify-self: end;
+  border-color: rgba(255, 255, 255, .36);
+  border-radius: 15px 15px 5px 15px;
+  color: #fff;
+}
+
+.mono-chat-preview__bubble time {
+  flex: none;
+  opacity: .7;
+  font-size: 9px;
+}
+
+.mono-chat-preview__composer {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  color: var(--text-2);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: var(--glass-edge);
+  font-size: 12px;
+}
+
+.mono-chat-preview__composer svg { color: var(--blue); }
+
+.mono-chat-setting-group {
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px solid var(--sep);
+}
+
+.mono-chat-setting-group h3 {
+  margin: 0 0 8px;
+  color: var(--text-2);
   font-size: 13px;
+  font-weight: 600;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-choice-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  border-top: 0;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-choice {
+  min-height: 82px;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  color: var(--text-2);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: var(--glass-edge);
+  font-size: 13px;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-choice[aria-pressed="true"] {
+  border-color: var(--blue);
+  color: var(--text);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--blue) 16%, var(--glass)), var(--glass));
+  box-shadow: var(--glass-edge), 0 0 0 2px var(--tint);
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-wallpaper-swatch {
+  height: 56px;
+  border-radius: 10px;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-chat-setting-group--colors {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: 14px;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-color-options {
+  gap: 6px;
+  padding: 3px 0;
+  border-top: 0;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-color-choice {
+  width: 32px;
+  height: 32px;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-settings-accent-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-preference-row {
+  min-height: 66px;
+  gap: 12px;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-preference-row b {
+  font-size: 15px;
+}
+
+.mono-settings-detail-page.mono-settings-detail-content--chats .mono-preference-row small {
+  font-size: 12px;
 }
 
 .mono-settings-panel {

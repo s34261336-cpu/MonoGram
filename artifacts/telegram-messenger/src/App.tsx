@@ -1542,8 +1542,28 @@ function SettingsPage() {
         break;
       case 'chats':
         content = <>
-          <section className="mono-settings-panel">
-            <h2>Размер текста сообщений</h2>
+          <section
+            className="mono-chat-preview"
+            aria-label="Предпросмотр переписки"
+            style={{ background: chatWallpaperOptions.find(option => option.value === preferences.chatWallpaper)?.background }}
+          >
+            <div className="mono-chat-preview__header">
+              <span className="mono-chat-preview__avatar">А</span>
+              <span><b style={{ color: preferences.chatNameColor === 'default' ? 'var(--text)' : chatNameColors[preferences.chatNameColor] }}>Алексей</b><small>в сети</small></span>
+              <span className="mono-chat-preview__label">ПРЕДПРОСМОТР</span>
+            </div>
+            <div className="mono-chat-preview__messages">
+              <div className="mono-chat-preview__bubble">
+                <span>Привет! Как тебе оформление переписки?</span><time>12:40</time>
+              </div>
+              <div className="mono-chat-preview__bubble mono-chat-preview__bubble--outgoing" style={{ fontSize: `${preferences.chatMessageSize}px`, background: chatAccentBackgrounds[preferences.chatAccent] }}>
+                <span>Теперь всё выглядит по-моему.</span><time>12:41</time>
+              </div>
+            </div>
+            <div className="mono-chat-preview__composer"><span>Сообщение</span><Send size={16}/></div>
+          </section>
+          <section className="mono-settings-panel mono-chat-appearance">
+            <h2>Внешний вид</h2>
             <label className="mono-settings-range">
               <span><span>Размер текста</span><b>{preferences.chatMessageSize}px</b></span>
               <input
@@ -1557,52 +1577,54 @@ function SettingsPage() {
                 data-testid="range-chat-message-size"
               />
             </label>
-          </section>
-          <section className="mono-settings-panel">
-            <h2>Обои переписки</h2>
-            <div className="mono-settings-choice-grid" aria-label="Выбор обоев переписки">
-              {chatWallpaperOptions.map(option => <button
-                className="mono-settings-choice"
-                type="button"
-                key={option.value}
-                aria-pressed={preferences.chatWallpaper === option.value}
-                aria-label={`Обои: ${option.label}`}
-                onClick={() => updatePreference('chatWallpaper', option.value)}
-                data-testid={`chat-wallpaper-${option.value}`}
-              >
-                <span className="mono-settings-wallpaper-swatch" style={{ background: option.background }} aria-hidden="true"/>
-                <span>{option.label}</span>
-              </button>)}
+            <div className="mono-chat-setting-group">
+              <h3>Обои</h3>
+              <div className="mono-settings-choice-grid" aria-label="Выбор обоев переписки">
+                {chatWallpaperOptions.map(option => <button
+                  className="mono-settings-choice"
+                  type="button"
+                  key={option.value}
+                  aria-pressed={preferences.chatWallpaper === option.value}
+                  aria-label={`Обои: ${option.label}`}
+                  onClick={() => updatePreference('chatWallpaper', option.value)}
+                  data-testid={`chat-wallpaper-${option.value}`}
+                >
+                  <span className="mono-settings-wallpaper-swatch" style={{ background: option.background }} aria-hidden="true"/>
+                  <span>{option.label}</span>
+                </button>)}
+              </div>
             </div>
-          </section>
-          <section className="mono-settings-panel">
-            <h2>Цвет имён</h2>
-            <div className="mono-settings-color-options" aria-label="Цвет имён собеседников">
-              {chatNameColorOptions.map(option => <button
-                className="mono-settings-color-choice"
-                type="button"
-                key={option.value}
-                aria-label={option.label}
-                aria-pressed={preferences.chatNameColor === option.value}
-                onClick={() => updatePreference('chatNameColor', option.value)}
-                data-testid={`chat-name-color-${option.value}`}
-              ><span style={{ background: option.color }} aria-hidden="true"/></button>)}
-            </div>
-          </section>
-          <section className="mono-settings-panel">
-            <h2>Цветовая тема сообщений</h2>
-            <div className="mono-settings-choice-grid mono-settings-accent-grid" aria-label="Цветовая тема исходящих сообщений">
-              {chatAccentOptions.map(option => <button
-                className="mono-settings-choice"
-                type="button"
-                key={option.value}
-                aria-pressed={preferences.chatAccent === option.value}
-                onClick={() => updatePreference('chatAccent', option.value)}
-                data-testid={`chat-accent-${option.value}`}
-              >
-                <span className="mono-settings-accent-swatch" style={{ background: option.background }} aria-hidden="true"/>
-                <span>{option.label}</span>
-              </button>)}
+            <div className="mono-chat-setting-group mono-chat-setting-group--colors">
+              <div>
+                <h3>Цвет имён</h3>
+                <div className="mono-settings-color-options" aria-label="Цвет имён собеседников">
+                  {chatNameColorOptions.map(option => <button
+                    className="mono-settings-color-choice"
+                    type="button"
+                    key={option.value}
+                    aria-label={option.label}
+                    aria-pressed={preferences.chatNameColor === option.value}
+                    onClick={() => updatePreference('chatNameColor', option.value)}
+                    data-testid={`chat-name-color-${option.value}`}
+                  ><span style={{ background: option.color }} aria-hidden="true"/></button>)}
+                </div>
+              </div>
+              <div>
+                <h3>Цвет сообщений</h3>
+                <div className="mono-settings-choice-grid mono-settings-accent-grid" aria-label="Цветовая тема исходящих сообщений">
+                  {chatAccentOptions.map(option => <button
+                    className="mono-settings-choice"
+                    type="button"
+                    key={option.value}
+                    aria-pressed={preferences.chatAccent === option.value}
+                    onClick={() => updatePreference('chatAccent', option.value)}
+                    data-testid={`chat-accent-${option.value}`}
+                  >
+                    <span className="mono-settings-accent-swatch" style={{ background: option.background }} aria-hidden="true"/>
+                    <span>{option.label}</span>
+                  </button>)}
+                </div>
+              </div>
             </div>
           </section>
           <section className="mono-settings-panel">
