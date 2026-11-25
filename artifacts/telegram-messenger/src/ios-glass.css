@@ -39,7 +39,7 @@
 
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  --blur: blur(24px) saturate(185%);
+  --blur: blur(32px) saturate(185%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -128,16 +128,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   overflow: hidden;
   background:
     radial-gradient(ellipse 90% 130% at 50% -20%, rgba(255, 255, 255, .38), transparent 58%),
-    linear-gradient(160deg, #55acf6 0%, #398fe5 58%, #2478cb 100%);
+    linear-gradient(160deg, color-mix(in srgb, var(--blue) 90%, transparent) 0%, color-mix(in srgb, var(--blue-2) 90%, transparent) 100%);
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, .42);
+  border: 1px solid rgba(255, 255, 255, .48);
   box-shadow:
     0 10px 24px rgba(38, 129, 217, .34),
     0 3px 8px rgba(18, 82, 145, .18),
     inset 0 1px 0 rgba(255, 255, 255, .62),
     inset 0 -1px 0 rgba(16, 91, 166, .34);
-  -webkit-backdrop-filter: blur(14px) saturate(155%);
-  backdrop-filter: blur(14px) saturate(155%);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
 }
 .primary-button::before {
   content: '';
@@ -149,7 +149,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   background: linear-gradient(180deg, rgba(255, 255, 255, .26), transparent);
   pointer-events: none;
 }
-.primary-button:hover { background: linear-gradient(160deg, #65b5f8 0%, #4599ec 58%, #2b82d5 100%); transform: none; }
+.primary-button:hover { background: linear-gradient(160deg, color-mix(in srgb, var(--blue) 96%, transparent), color-mix(in srgb, var(--blue-2) 96%, transparent)); transform: none; }
 .primary-button:active, .outline-button:active { transform: scale(.96); }
 .primary-button:disabled { opacity: .5; transform: none; box-shadow: none; }
 .outline-button {
@@ -174,7 +174,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .chat-menu-button:active, .mono-screen-header-actions > button:active,
 .tg-account-back:active, .tg-account-save:active, .mobile-back:active, .quiet-icon:active { transform: scale(.9); }
-.tg-account-save { background: var(--blue); color: #fff; border-color: transparent; }
+.tg-account-save { background: color-mix(in srgb, var(--blue) 88%, transparent); color: #fff; border-color: transparent; }
 .tg-account-save:disabled { opacity: .5; }
 .quiet-icon { margin-left: auto; }
 .mobile-back { display: none; }
@@ -225,8 +225,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   position: sticky; top: 0; z-index: 20;
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
   min-height: 72px; margin: 0 -16px; padding: calc(10px + var(--safe-t)) 16px 10px;
-  background: none; border: 0; box-shadow: none;
-  -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: var(--glass); border: 0; border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
 }
 /* «мягкий край»: контент плавно уходит под размытие */
 .mono-screen-header::before,
@@ -261,8 +262,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   min-width: 232px; padding: 6px; margin: 0;
   display: grid; gap: 2px;
   border-radius: 22px;
-  background: var(--glass-strong); border: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(34px) saturate(190%); backdrop-filter: blur(34px) saturate(190%);
+  background: var(--glass-card); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
   box-shadow: var(--glass-edge), 0 20px 56px rgba(15, 25, 45, .26);
   animation: pop-in .18s cubic-bezier(.3, .9, .3, 1);
   transform-origin: top right;
@@ -299,6 +300,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chat-sidebar-head {
   position: relative; display: flex; align-items: center; justify-content: flex-end;
   min-height: 56px; padding: 0; margin-bottom: 10px;
+  background: var(--glass); border-bottom: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
 }
 .chat-sidebar-head h1 {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0;
@@ -351,8 +354,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chat-compose-fab {
   position: fixed; z-index: 35; right: 18px; bottom: calc(94px + var(--safe-b));
   width: 58px; height: 58px; display: grid; place-items: center;
-  border: 0; border-radius: 50%; color: #fff;
-  background: linear-gradient(155deg, #55adf8, #2580d8);
+  border: 1px solid rgba(255, 255, 255, .48); border-radius: 50%; color: #fff;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--blue) 90%, transparent), color-mix(in srgb, var(--blue-2) 90%, transparent));
   box-shadow: 0 12px 28px rgba(38, 128, 216, .45), inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -2px 6px rgba(0, 40, 100, .18);
   transition: transform .15s;
 }
@@ -383,6 +386,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   position: relative; z-index: 25; flex: 0 0 auto; height: 62px;
   margin: calc(10px + var(--safe-t)) 12px 0; padding: 0 8px; gap: 10px;
   display: flex; align-items: center; border-radius: 31px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
 }
 .chat-topbar .avatar { width: 42px; height: 42px; }
 .chat-top-person { min-width: 0; display: grid; gap: 2px; }
@@ -431,8 +437,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .composer-count { font-size: 12px; color: var(--text-3); white-space: nowrap; }
 .send-circle {
   width: 42px; height: 42px; flex: none; display: grid; place-items: center;
-  border: 0; border-radius: 50%; color: #fff;
-  background: linear-gradient(155deg, #55adf8, #2580d8);
+  border: 1px solid rgba(255, 255, 255, .48); border-radius: 50%; color: #fff;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--blue) 90%, transparent), color-mix(in srgb, var(--blue-2) 90%, transparent));
   box-shadow: 0 4px 12px rgba(38, 128, 216, .4), inset 0 1px 0 rgba(255, 255, 255, .45);
   transition: transform .15s, opacity .2s;
 }
@@ -458,7 +464,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .tg-profile-camera {
   position: absolute; right: -2px; bottom: -2px; width: 38px; height: 38px;
   display: grid; place-items: center; padding: 0; border-radius: 50%;
-  border: 3px solid var(--bg-edge); background: var(--blue); color: #fff;
+  border: 2px solid rgba(255, 255, 255, .58); background: color-mix(in srgb, var(--blue) 88%, transparent); color: #fff;
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
 }
 .tg-profile-header h1 { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--text); }
 .tg-profile-status { font-size: 15px; color: var(--text-2); }
@@ -496,6 +503,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   position: sticky; top: 0; z-index: 20;
   display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px;
   min-height: 72px; margin: 0 -16px; padding: calc(10px + var(--safe-t)) 16px 10px;
+  background: var(--glass); border-bottom: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
 }
 .tg-account-header h1 { grid-column: 2; }
 .tg-account-form { display: grid; gap: 4px; }
@@ -633,18 +642,16 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
 .saved-note { font-size: 14px; color: var(--green); }
 
 /* ---------- Диалоги ---------- */
-.modal-backdrop { z-index: 80; align-items: center; padding: 24px; background: rgba(10, 18, 30, .38); -webkit-backdrop-filter: blur(10px) saturate(120%); backdrop-filter: blur(10px) saturate(120%); }
+.modal-backdrop { z-index: 80; align-items: center; padding: 24px; background: rgba(10, 18, 30, .38); -webkit-backdrop-filter: blur(16px) saturate(145%); backdrop-filter: blur(16px) saturate(145%); }
 .dialog,
-[role="dialog"][data-state],
-[role="alertdialog"] {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
+[role="dialog"],
+[role="alertdialog"],
+[data-radix-popper-content-wrapper] > * {
   color: var(--text);
   background:
     radial-gradient(ellipse 105% 60% at 50% -12%, rgba(255, 255, 255, .3), transparent 70%),
     linear-gradient(145deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .045)),
-    var(--glass-strong);
+    var(--glass-card);
   border: 1px solid rgba(255, 255, 255, .3);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, .56),
@@ -654,8 +661,15 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
   -webkit-backdrop-filter: blur(38px) saturate(175%);
   backdrop-filter: blur(38px) saturate(175%);
 }
+.dialog,
+[role="dialog"],
+[role="alertdialog"] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
 .dialog::before,
-[role="dialog"][data-state]::before,
+[role="dialog"]::before,
 [role="alertdialog"]::before {
   content: '';
   position: absolute;
@@ -673,7 +687,7 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
   animation: sheet-up .3s cubic-bezier(.3, .9, .3, 1);
 }
 .dialog button:not(.primary-button),
-[role="dialog"][data-state] button:not(.primary-button),
+[role="dialog"] button:not(.primary-button),
 [role="alertdialog"] button:not(.primary-button) {
   border: 1px solid rgba(255, 255, 255, .24);
   background: linear-gradient(145deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07));
@@ -682,7 +696,7 @@ a[href="/stars"] .mono-settings-icon { background: linear-gradient(155deg, #ffd2
   backdrop-filter: blur(20px) saturate(155%);
 }
 .dialog button:not(.primary-button):hover,
-[role="dialog"][data-state] button:not(.primary-button):hover,
+[role="dialog"] button:not(.primary-button):hover,
 [role="alertdialog"] button:not(.primary-button):hover {
   background: linear-gradient(145deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .12));
 }
@@ -1617,4 +1631,16 @@ html, body { background-color: var(--bg-edge); color: var(--text); }
   .mono-settings-row--detailed { min-height: 58px; }
   .mono-settings-detail-header { margin-bottom: 10px; }
   .mono-settings-panel { padding-right: 14px; padding-left: 14px; }
+}
+
+:is(.primary-button, .outline-button, .chat-menu-button, .mono-screen-header-actions > button,
+  .tg-account-back, .tg-account-save, .mobile-back, .quiet-icon, .chat-compose-fab,
+  .send-circle, .composer-attach, .composer-image-preview button, .tg-profile-camera,
+  .tg-profile-actions button, .dialog-close, .mono-settings-detail-header > button,
+  .search-control button, .mono-settings-search button, .mono-contact-search button,
+  .chat-header-menu button, .mono-screen-menu button, .tg-profile-bio-menu button,
+  .tg-profile-username-menu button, .user-result) {
+  border: 1px solid rgba(255, 255, 255, .38);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
 }
