@@ -484,36 +484,37 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* ---------- Профиль ---------- */
 .tg-profile { display: flex; flex-direction: column; }
-.tg-profile-header { display: grid; justify-items: center; gap: 6px; padding: 8px 0 18px; text-align: center; }
-.tg-profile-avatar-wrap { position: relative; width: 112px; height: 112px; margin-bottom: 8px; }
-.tg-profile-avatar-wrap > .avatar { width: 112px; height: 112px; font-size: 40px; box-shadow: 0 12px 32px rgba(51, 144, 236, .28); }
+.tg-profile-header { display: grid; justify-items: center; gap: 6px; padding: 10px 0 16px; text-align: center; }
+.tg-profile-avatar-wrap { position: relative; width: 100px; height: 100px; margin-bottom: 8px; }
+.tg-profile-avatar-wrap > .avatar { width: 100px; height: 100px; font-size: 36px; box-shadow: 0 12px 32px rgba(51, 144, 236, .28); }
 .tg-profile-camera {
   position: absolute; right: -2px; bottom: -2px; width: 38px; height: 38px;
   display: grid; place-items: center; padding: 0; border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, .58); background: color-mix(in srgb, var(--blue) 88%, transparent); color: #fff;
   -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
 }
-.tg-profile-header h1 { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--text); }
+.tg-profile-header h1 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; color: var(--text); }
 .tg-profile-status { font-size: 15px; color: var(--text-2); }
-.tg-profile-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.tg-profile-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .tg-profile-actions button {
-  min-height: 78px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
-  border-radius: 22px; border: 1px solid var(--glass-border); color: var(--blue);
+  height: 72px; min-height: 72px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  border-radius: 24px; border: 1px solid var(--glass-border); color: var(--blue);
   background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--glass-edge), 0 6px 18px rgba(30, 48, 80, .08);
   transition: transform .15s;
 }
 .tg-profile-actions button:active { transform: scale(.95); }
-.tg-profile-actions button span { font-size: 13px; font-weight: 600; }
-.tg-profile-card { padding: 0; overflow: visible; }
-.tg-profile-info-row { position: relative; display: grid; gap: 3px; padding: 13px 18px; border-top: 1px solid var(--sep); }
+.tg-profile-actions button svg { width: 24px; height: 24px; }
+.tg-profile-actions button span { font-size: 14px; font-weight: 600; }
+.tg-profile-card { padding: 0; overflow: visible; border-radius: 24px; }
+.tg-profile-info-row { position: relative; display: grid; gap: 3px; padding: 16px; border-top: 1px solid var(--sep); }
 .tg-profile-info-row:first-child { border-top: 0; }
 .tg-profile-info-row p { margin: 0; font-size: 17px; line-height: 1.3; color: var(--text); }
-.tg-profile-info-row span { font-size: 13px; color: var(--text-2); }
+.tg-profile-info-row span { font-size: 14px; line-height: 1.3; color: var(--text-2); }
 .tg-profile-bio-row { padding: 0; }
-.tg-profile-bio-trigger { width: 100%; display: grid; gap: 3px; padding: 13px 18px; text-align: left; border: 0; background: transparent; color: inherit; border-radius: 0; }
+.tg-profile-bio-trigger { width: 100%; display: grid; gap: 3px; padding: 16px; text-align: left; border: 0; background: transparent; color: inherit; border-radius: 24px; }
 .tg-profile-bio-trigger:active { background: var(--hover); }
 .tg-profile-username-row { padding: 0; }
-.tg-profile-username-trigger { width: 100%; display: grid; gap: 3px; padding: 13px 18px; text-align: left; border: 0; background: transparent; color: inherit; border-radius: 0; cursor: pointer; }
+.tg-profile-username-trigger { width: 100%; display: grid; gap: 3px; padding: 16px; text-align: left; border: 0; background: transparent; color: inherit; border-radius: 24px; cursor: pointer; }
 .tg-profile-username-trigger:active { background: var(--hover); }
 .tg-profile-username-trigger:focus-visible { outline: 2px solid var(--blue); outline-offset: -3px; }
 .tg-profile-username-trigger p { margin: 0; font-size: 17px; line-height: 1.3; color: var(--text); }
