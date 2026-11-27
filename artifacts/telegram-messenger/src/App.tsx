@@ -24,6 +24,36 @@ import { ru } from 'date-fns/locale';
 import './auth-screen.css';
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 12_000, retry: 1, refetchOnWindowFocus: true } } });
+
+function useDismissOnOutside<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
+  const elementRef = useRef<T>(null);
+  const dismissRef = useRef(onDismiss);
+
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !elementRef.current?.contains(event.target)) {
+        dismissRef.current();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismissRef.current();
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return elementRef;
+}
+
 const wallpaperArtwork: Record<ChatWallpaper, string> = {
   default: new URL('./assets/chat-wallpapers/winter.svg', import.meta.url).href,
   blue: new URL('./assets/chat-wallpapers/flowers.svg', import.meta.url).href,
@@ -483,6 +513,8 @@ function ChatWorkspace() {
   const [search, setSearch] = useState('');
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [showConversationDetails, setShowConversationDetails] = useState(false);
+  const chatMenuRef = useDismissOnOutside<HTMLDivElement>(showChatMenu, () => setShowChatMenu(false));
+  const conversationDetailsRef = useDismissOnOutside<HTMLElement>(showConversationDetails, () => setShowConversationDetails(false));
   const [username, setUsername] = useState('');
   const [newChat, setNewChat] = useState(false);
   const [startError, setStartError] = useState('');
@@ -586,7 +618,7 @@ function ChatWorkspace() {
       <div className="chat-sidebar-top">
         <header className="chat-sidebar-head">
           <h1>Чаты</h1>
-          <div className="chat-header-actions">
+          <div className="chat-header-actions" ref={chatMenuRef}>
             <button
               className="chat-menu-button"
               type="button"
@@ -694,7 +726,7 @@ function ChatWorkspace() {
     </aside>
     <section className="chat-stage">
       {current ? <>
-         <header className="chat-topbar glass-surface"><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={isUserOnline(current.person.lastSeen) ? 'presence-online' : ''}>{userPresenceLabel(current.person.lastSeen)}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>{profileIdentifier(current.person)}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
+         <header className="chat-topbar glass-surface" ref={conversationDetailsRef}><button className="mobile-back" onClick={() => setPath('/')} aria-label="Назад к перепискам" data-testid="button-back-chats"><ArrowLeft size={19}/></button><Avatar profile={current.person} size="sm"/><div className="chat-top-person"><b>{current.person.displayName}</b><span className={isUserOnline(current.person.lastSeen) ? 'presence-online' : ''}>{userPresenceLabel(current.person.lastSeen)}</span></div><button className="quiet-icon" onClick={() => setShowConversationDetails(value => !value)} aria-label="Информация о собеседнике" aria-expanded={showConversationDetails} data-testid="button-conversation-options"><MoreHorizontal size={20}/></button>{showConversationDetails && <div className="conversation-details"><b>{current.person.displayName}</b><span>{profileIdentifier(current.person)}</span>{current.person.bio && <p>{current.person.bio}</p>}<small><Shield size={13}/> Личная переписка</small></div>}</header>
          <div className="message-area" ref={messageAreaRef}>
           {messagesQuery.isLoading ? <div className="message-skeleton"><i/><i/><i/></div> : messagesQuery.isError ? <StateBlock title="Не удалось загрузить сообщения" detail="Переписка сохранена. Попробуйте ещё раз." action="Повторить" onAction={() => messagesQuery.refetch()} /> : messages.length === 0 ? <div className="chat-welcome"><span className="welcome-symbol"><MessageCircle size={23}/></span><span className="overline">ЛИЧНАЯ ПЕРЕПИСКА</span><h2>Поздоровайтесь с {current.person.displayName.split(' ')[0]}.</h2><p>Эту переписку видите только вы и собеседник.</p></div> : <div className="message-thread">{messages.map((message: DirectMessage) => {
             const mine = message.authorId === user?.id;
@@ -721,7 +753,7 @@ function ChatWorkspace() {
     <button className="chat-compose-fab" type="button" onClick={() => setNewChat(true)} aria-label="Написать сообщение" title="Новое сообщение" data-testid="button-new-chat">
       <PenLine size={22} />
     </button>
-     {newChat && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setNewChat(false); }}><section className="dialog glass-card"><button className="dialog-close" onClick={() => setNewChat(false)} aria-label="Закрыть"><X size={18}/></button><span className="overline">НАЧНИТЕ ЛИЧНУЮ ПЕРЕПИСКУ</span><h2>Найти человека</h2><p>Введите имя пользователя или числовой ID. Профиль останется закрытым, пока вы не напишете первым.</p><div className="username-input"><Search size={17}/><input autoFocus aria-label="Имя пользователя или ID" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ''))} placeholder="имя пользователя или ID" data-testid="input-find-username"/></div>
+    {newChat && <div className="modal-backdrop" onPointerDown={e => { if (e.target === e.currentTarget) setNewChat(false); }}><section className="dialog glass-card"><button className="dialog-close" onClick={() => setNewChat(false)} aria-label="Закрыть"><X size={18}/></button><span className="overline">НАЧНИТЕ ЛИЧНУЮ ПЕРЕПИСКУ</span><h2>Найти человека</h2><p>Введите имя пользователя или числовой ID. Профиль останется закрытым, пока вы не напишете первым.</p><div className="username-input"><Search size={17}/><input autoFocus aria-label="Имя пользователя или ID" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ''))} placeholder="имя пользователя или ID" data-testid="input-find-username"/></div>
       {canSearchUsers(username) && <div className="user-results">{searchUsers.isLoading ? <div className="result-hint">Ищем людей…</div> : searchUsers.isError ? <div className="result-hint">Сейчас поиск недоступен.</div> : searchUsers.data?.length ? searchUsers.data.map(person => <button key={person.id} className="user-result" onClick={() => void beginChat(person.username || person.publicId)} data-testid={`user-result-${person.id}`}><Avatar profile={person} size="sm"/><span><b>{person.displayName}</b><small>{profileIdentifier(person)}</small></span><ArrowLeft size={15}/></button>) : <div className="result-hint">Пользователей с таким именем или ID нет.</div>}</div>}
       {startError && <p className="form-error" role="alert">{startError}</p>}
       <button className="primary-button full-button" onClick={() => void beginChat()} disabled={!username.trim() || startConversation.isPending} data-testid="button-start-conversation">{startConversation.isPending ? <LoaderCircle className="spin" size={16}/> : <MessageCircle size={16}/>} Начать переписку</button>
@@ -755,7 +787,7 @@ function ChannelsPage() {
     <PageHeader kicker="ОТКРЫТЫЕ СООБЩЕСТВА" title="Каналы" description="Читайте авторов, которые вам интересны, и делитесь своими мыслями." action={<button className="primary-button" onClick={() => setModal(true)} data-testid="button-create-channel"><Plus size={16}/> Создать канал</button>}/>
     <div className="directory-toolbar"><div className="search-control directory-search"><Search size={16}/><input aria-label="Поиск по каналам" value={filter} onChange={e => setFilter(e.target.value)} placeholder="Найти канал" data-testid="input-channel-search"/></div><span>{query.isLoading ? 'Загрузка…' : `${channels.length} ${channelCountLabel(channels.length)}`}</span></div>
     {query.isLoading ? <div className="channel-grid">{[1,2,3].map(i=><div className="channel-skeleton glass-card" key={i}><i/><b/><span/></div>)}</div> : query.isError ? <StateBlock title="Каналы недоступны" detail="Проверьте подключение к интернету." action="Повторить" onAction={() => query.refetch()}/> : shown.length === 0 ? <div className="empty-panel"><div className="empty-mark"><Compass size={21}/></div><h2>{filter ? 'Ничего не найдено' : 'Здесь пока пусто'}</h2><p>{filter ? 'Попробуйте другое название или имя пользователя.' : 'Здесь появятся каналы, на которые вы подпишетесь. Создайте канал, если хотите чем-то поделиться.'}</p>{!filter && <button className="outline-button" onClick={() => setModal(true)} data-testid="button-create-first-channel"><Plus size={15}/> Создать канал</button>}</div> : <div className="channel-grid">{shown.map((channel: Channel, index) => <ChannelCard key={channel.id} channel={channel} index={index}/>)}</div>}
-    {modal && <div className="modal-backdrop"><section className="dialog glass-card"><button className="dialog-close" onClick={() => setModal(false)} aria-label="Закрыть"><X size={18}/></button><h2>Создать канал</h2><p>Придумайте название и короткое имя для поиска.</p><Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack">
+    {modal && <div className="modal-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) setModal(false); }}><section className="dialog glass-card"><button className="dialog-close" onClick={() => setModal(false)} aria-label="Закрыть"><X size={18}/></button><h2>Создать канал</h2><p>Придумайте название и короткое имя для поиска.</p><Form {...form}><form onSubmit={form.handleSubmit(submit)} className="form-stack">
       <FormField control={form.control} name="title" rules={{ required: 'Введите название канала.' }} render={({field})=><FormItem><FormLabel>Название канала</FormLabel><FormControl><Input placeholder="Например, «Идеи на выходные»" {...field} data-testid="input-channel-title"/></FormControl><FormMessage/></FormItem>}/>
       <FormField control={form.control} name="username" rules={{required:'Придумайте имя пользователя.',pattern:{value:/^[a-z][a-z0-9_]{2,31}$/i,message:'От 3 до 32 латинских букв, цифр или знаков подчёркивания.'}}} render={({field})=><FormItem><FormLabel>Имя пользователя</FormLabel><FormControl><div className="input-prefix"><span>@</span><Input placeholder="primer_kanala" {...field} data-testid="input-channel-username"/></div></FormControl><FormMessage/></FormItem>}/>
       <FormField control={form.control} name="description" render={({field})=><FormItem><FormLabel>Описание</FormLabel><FormControl><Textarea placeholder="О чём будет этот канал?" {...field} data-testid="input-channel-description"/></FormControl><FormMessage/></FormItem>}/>
@@ -805,6 +837,8 @@ function ProfilePage() {
   const [bioMenuOpen,setBioMenuOpen] = useState(false);
   const [usernameMenuOpen,setUsernameMenuOpen] = useState(false);
   const [profileMenuOpen,setProfileMenuOpen] = useState(false);
+  const [profileTab,setProfileTab] = useState<'gifts'|'posts'|'archive'>('gifts');
+  const profileMenuRef = useDismissOnOutside<HTMLDivElement>(profileMenuOpen, () => setProfileMenuOpen(false));
   const [bioNotice,setBioNotice] = useState('');
   const [usernameNotice,setUsernameNotice] = useState('');
   const [uploadingAvatar,setUploadingAvatar] = useState(false);
@@ -944,7 +978,7 @@ function ProfilePage() {
       <header className="mono-screen-header tg-profile-toolbar">
         <span className="mono-screen-header-spacer" aria-hidden="true"/>
         <h2>Профиль</h2>
-        <div className="mono-screen-header-actions">
+        <div className="mono-screen-header-actions" ref={profileMenuRef}>
           <button type="button" aria-label="Дополнительные действия" title="Дополнительные действия" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen(value => !value)} data-testid="button-profile-menu">
             <MoreVertical size={21}/>
           </button>
@@ -1032,6 +1066,13 @@ function ProfilePage() {
       {bioNotice && <p className="tg-profile-bio-notice" role="status">{bioNotice}</p>}
       {usernameNotice && <p className="tg-profile-username-notice" role="status">{usernameNotice}</p>}
       {form.formState.errors.root?.message && <p className="tg-profile-bio-notice" role="alert">{form.formState.errors.root.message}</p>}
+
+      <div className="tg-profile-tabs" role="tablist" aria-label="Разделы профиля">
+        <button type="button" role="tab" aria-selected={profileTab === 'gifts'} className={profileTab === 'gifts' ? 'is-active' : ''} onClick={() => setProfileTab('gifts')}>Подарки</button>
+        <button type="button" role="tab" aria-selected={profileTab === 'posts'} className={profileTab === 'posts' ? 'is-active' : ''} onClick={() => setProfileTab('posts')}>Публикации</button>
+        <button type="button" role="tab" aria-selected={profileTab === 'archive'} className={profileTab === 'archive' ? 'is-active' : ''} onClick={() => setProfileTab('archive')}>Архив</button>
+      </div>
+      <div className="tg-profile-tab-content" role="tabpanel" aria-label="Содержимое вкладки профиля" />
 
       {editing && <section className="tg-profile-edit glass-card" aria-label="Редактирование профиля">
         <h2>Редактировать профиль</h2>
@@ -1507,6 +1548,7 @@ function SettingsPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const settingsMenuRef = useDismissOnOutside<HTMLDivElement>(menuOpen, () => setMenuOpen(false));
   const [confirmCacheClear, setConfirmCacheClear] = useState(false);
   const section = path.startsWith('/settings/') ? path.slice('/settings/'.length).split('/')[0] : '';
   const normalizedSearch = searchTerm.trim().toLocaleLowerCase('ru');
@@ -1793,7 +1835,7 @@ function SettingsPage() {
     <header className="mono-screen-header">
       <span className="mono-screen-header-spacer" aria-hidden="true"/>
       <h1>Настройки</h1>
-      <div className="mono-screen-header-actions">
+      <div className="mono-screen-header-actions" ref={settingsMenuRef}>
         <button type="button" aria-label="Поиск настроек" title="Поиск настроек" aria-expanded={searchOpen} onClick={() => { setSearchOpen(value => !value); setMenuOpen(false); if (searchOpen) setSearchTerm(''); }} data-testid="button-settings-search"><Search size={21}/></button>
         <button type="button" aria-label="Дополнительные действия" title="Дополнительные действия" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value); setSearchOpen(false); }} data-testid="button-settings-menu"><MoreVertical size={21}/></button>
         {menuOpen && <div className="mono-screen-menu" role="menu">
