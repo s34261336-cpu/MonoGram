@@ -484,6 +484,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* ---------- Профиль ---------- */
 .tg-profile { display: flex; flex-direction: column; }
+.tg-profile-avatar-input { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .tg-profile-header { display: grid; justify-items: center; gap: 6px; padding: 10px 0 16px; text-align: center; }
 .tg-profile-avatar-wrap { position: relative; width: 100px; height: 100px; margin-bottom: 8px; }
 .tg-profile-avatar-wrap > .avatar { width: 100px; height: 100px; font-size: 36px; box-shadow: 0 12px 32px rgba(51, 144, 236, .28); }
@@ -497,14 +498,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .tg-profile-status { font-size: 15px; color: var(--text-2); }
 .tg-profile-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .tg-profile-actions button {
-  height: 72px; min-height: 72px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  height: 72px; min-height: 72px; padding: 8px 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   border-radius: 24px; border: 1px solid var(--glass-border); color: var(--blue);
   background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--glass-edge), 0 6px 18px rgba(30, 48, 80, .08);
   transition: transform .15s;
 }
 .tg-profile-actions button:active { transform: scale(.95); }
-.tg-profile-actions button svg { width: 24px; height: 24px; }
-.tg-profile-actions button span { font-size: 14px; font-weight: 600; }
+.tg-profile-actions button:disabled, .tg-profile-camera:disabled { opacity: .55; cursor: wait; }
+.tg-profile-actions button svg { width: 24px; height: 24px; flex: 0 0 24px; display: block; }
+.tg-profile-actions button span { width: 100%; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 18px; font-weight: 600; text-align: center; }
 .tg-profile-card { padding: 0; overflow: visible; border-radius: 24px; }
 .tg-profile-info-row { position: relative; display: grid; gap: 3px; padding: 16px; border-top: 1px solid var(--sep); }
 .tg-profile-info-row:first-child { border-top: 0; }

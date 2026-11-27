@@ -143,6 +143,35 @@ router.get('/profile', handleRoute(async (req, res) => {
   res.json(toProfile(data as ProfileRow));
 }));
 
+router.post('/profile/avatar', handleRoute(async (req, res) => {
+  const id = userId(req);
+  const dataUrl = typeof req.body?.dataUrl === 'string' ? req.body.dataUrl : '';
+  const match = /^data:(image\/jpeg|image\/png|image\/webp);base64,(.+)$/s.exec(dataUrl);
+  if (!match) throw apiError('Выберите изображение JPG, PNG или WebP.');
+  const encoded = match[2];
+  if (encoded.length > 4 * 1024 * 1024) throw apiError('Изображение слишком большое.');
+  const bytes = Buffer.from(encoded, 'base64');
+  if (!bytes.length) throw apiError('Не удалось прочитать изображение.');
+
+  const storagePath = `${id}/${randomUUID()}.jpg`;
+  const { error: uploadError } = await supabaseAdmin.storage.from('avatars').upload(storagePath, bytes, {
+    contentType: 'image/jpeg',
+    cacheControl: '3600',
+    upsert: false,
+  });
+  checkError(uploadError);
+
+  const { data: publicUrl } = supabaseAdmin.storage.from('avatars').getPublicUrl(storagePath);
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .update({ avatar_url: publicUrl.publicUrl, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select(profileFields)
+    .single();
+  checkError(error);
+  res.json(toProfile(data as ProfileRow));
+}));
+
 router.patch('/profile', handleRoute(async (req, res) => {
   const id = userId(req);
   const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';

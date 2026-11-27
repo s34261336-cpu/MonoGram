@@ -71,6 +71,25 @@ const chatNameColors: Record<ChatNameColor, string> = {
 };
 const dateLabel = (value?: string) => value ? formatDistanceToNow(new Date(value), { addSuffix: true, locale: ru }) : '';
 const clock = (value?: string) => value ? format(new Date(value), 'HH:mm') : '';
+async function loadAvatarSource(file: File): Promise<{ source: CanvasImageSource; width: number; height: number; close: () => void }> {
+  if (typeof createImageBitmap === 'function') {
+    const bitmap = await createImageBitmap(file);
+    return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close?.() };
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error('Не удалось прочитать изображение.'));
+      element.src = url;
+    });
+    return { source: image, width: image.naturalWidth, height: image.naturalHeight, close: () => URL.revokeObjectURL(url) };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
 const isUserOnline = (lastSeen: Profile['lastSeen']) => {
   if (!lastSeen) return false;
   const difference = Date.now() - new Date(lastSeen).getTime();
@@ -788,6 +807,8 @@ function ProfilePage() {
   const [profileMenuOpen,setProfileMenuOpen] = useState(false);
   const [bioNotice,setBioNotice] = useState('');
   const [usernameNotice,setUsernameNotice] = useState('');
+  const [uploadingAvatar,setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const bioMenuRef = useRef<HTMLDivElement>(null);
   const usernameMenuRef = useRef<HTMLDivElement>(null);
   const form = useForm<{username:string;avatarUrl:string}>({defaultValues:{username:'',avatarUrl:''}});
@@ -855,18 +876,70 @@ function ProfilePage() {
     }
   }
   function openPhotoEditor() {
-    if (editing) {
-      setEditing(false);
+    avatarInputRef.current?.click();
+  }
+
+  async function uploadAvatarFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setSaved(false);
+      form.setError('root', { message: 'Выберите изображение.' });
       return;
     }
-    setEditing(true);
-    window.requestAnimationFrame(() => {
-      const photoField = document.querySelector<HTMLInputElement>('[data-testid="input-profile-avatar"]');
-      photoField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      photoField?.focus();
-    });
+    setUploadingAvatar(true);
+    form.clearErrors('root');
+    try {
+      const image = await loadAvatarSource(file);
+      const size = 200;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        image.close();
+        throw new Error('Canvas недоступен.');
+      }
+
+      const sourceSize = Math.min(image.width, image.height);
+      const sourceX = (image.width - sourceSize) / 2;
+      const sourceY = (image.height - sourceSize) / 2;
+      context.drawImage(image.source, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+      image.close();
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(value => value ? resolve(value) : reject(new Error('Не удалось обработать изображение.')), 'image/jpeg', 0.7);
+      });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Не удалось прочитать изображение.'));
+        reader.readAsDataURL(blob);
+      });
+
+      await apiRequest<Profile>('/api/messenger/profile/avatar', {
+        method: 'POST',
+        body: JSON.stringify({ dataUrl }),
+      });
+      await query.refetch();
+      setSaved(true);
+    } catch (cause) {
+      form.setError('root', { message: userError(cause, 'Не удалось загрузить аватарку.') });
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
   return <div className="page-content tg-profile-page">
+    <input
+      ref={avatarInputRef}
+      className="tg-profile-avatar-input"
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      aria-label="Выбрать фото профиля"
+      onChange={event => {
+        const file = event.currentTarget.files?.[0];
+        event.currentTarget.value = '';
+        if (file) void uploadAvatarFile(file);
+      }}
+    />
     {query.isLoading ? <div className="loading-panel glass-card"><i/><b/><span/></div> : query.isError ? <StateBlock title="Профиль недоступен" detail="Попробуйте загрузить профиль ещё раз." action="Повторить" onAction={()=>query.refetch()}/> : <main className="tg-profile">
       <header className="mono-screen-header tg-profile-toolbar">
         <span className="mono-screen-header-spacer" aria-hidden="true"/>
@@ -884,7 +957,7 @@ function ProfilePage() {
       <header className="tg-profile-header">
         <div className="tg-profile-avatar-wrap">
           <Avatar profile={profile} size="lg"/>
-          <button className="tg-profile-camera" type="button" onClick={openPhotoEditor} aria-label="Изменить фото профиля">
+          <button className="tg-profile-camera" type="button" onClick={openPhotoEditor} disabled={uploadingAvatar} aria-label="Изменить фото профиля">
             <Camera size={18}/>
           </button>
         </div>
@@ -893,8 +966,8 @@ function ProfilePage() {
       </header>
 
       <div className="tg-profile-actions" aria-label="Действия профиля">
-        <button type="button" onClick={openPhotoEditor} data-testid="button-profile-photo">
-          <Camera size={19}/><span>{editing ? 'Скрыть фото' : 'Выбрать фото'}</span>
+        <button type="button" onClick={openPhotoEditor} disabled={uploadingAvatar} data-testid="button-profile-photo">
+          <Camera size={24}/><span>{uploadingAvatar ? 'Загружаем…' : 'Выбрать фото'}</span>
         </button>
         <button type="button" onClick={() => setPath('/profile/edit')} data-testid="button-edit-profile">
           <PenLine size={19}/><span>Изменить</span>
@@ -958,6 +1031,7 @@ function ProfilePage() {
       </section>
       {bioNotice && <p className="tg-profile-bio-notice" role="status">{bioNotice}</p>}
       {usernameNotice && <p className="tg-profile-username-notice" role="status">{usernameNotice}</p>}
+      {form.formState.errors.root?.message && <p className="tg-profile-bio-notice" role="alert">{form.formState.errors.root.message}</p>}
 
       {editing && <section className="tg-profile-edit glass-card" aria-label="Редактирование профиля">
         <h2>Редактировать профиль</h2>
