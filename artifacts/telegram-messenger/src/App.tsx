@@ -22,6 +22,7 @@ import { ArrowLeft, ArrowRight, AtSign, Bell, BriefcaseBusiness, Camera, Check, 
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import './auth-screen.css';
+import './gift-shop.css';
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 12_000, retry: 1, refetchOnWindowFocus: true } } });
 
@@ -502,7 +503,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       '--chat-name-color': preferences.chatNameColor === 'default' ? 'var(--text)' : chatNameColors[preferences.chatNameColor],
     } as CSSProperties}>
       <div className="workspace-main">{children}</div>
-      <Navigation profile={profile} hidden={inConversation || path === '/profile/edit' || path === '/profile/username'} unreadChatsCount={unreadChatsCount} showUnreadBadge={preferences.showUnreadBadge} />
+      <Navigation profile={profile} hidden={inConversation || path === '/profile/edit' || path === '/profile/username' || path === '/gifts'} unreadChatsCount={unreadChatsCount} showUnreadBadge={preferences.showUnreadBadge} />
     </div>
   </UnreadChatsCountContext.Provider>;
 }
@@ -1348,6 +1349,82 @@ function StarsPage() {
   </div>;
 }
 
+const giftCatalog = [
+  { id: 'heart', name: 'Сердце с бантом', emoji: '💝', price: 15, brand: 'monogram', collectible: false },
+  { id: 'bear', name: 'Мишка', emoji: '🧸', price: 15, brand: 'monogram', collectible: false },
+  { id: 'gift-box', name: 'Подарок', emoji: '🎁', price: 25, brand: 'monogram', collectible: false },
+  { id: 'rose', name: 'Роза', emoji: '🌹', price: 25, brand: 'monogram', collectible: false },
+  { id: 'cake', name: 'Торт', emoji: '🎂', price: 50, brand: 'monogram', collectible: true },
+  { id: 'bouquet', name: 'Букет', emoji: '💐', price: 50, brand: 'monogram', collectible: true },
+  { id: 'rocket', name: 'Ракета', emoji: '🚀', price: 100, brand: 'original', collectible: true },
+  { id: 'trophy', name: 'Кубок', emoji: '🏆', price: 100, brand: 'original', collectible: true },
+  { id: 'ring', name: 'Кольцо', emoji: '💍', price: 100, brand: 'original', collectible: true },
+] as const;
+
+function GiftShopPage() {
+  const { user } = useAuth();
+  const [, setPath] = useLocation();
+  const profileQuery = useProfile(user?.id || '');
+  const walletQuery = useWallet(user?.id || '');
+  const [brand, setBrand] = useState<'monogram' | 'original'>('monogram');
+  const [category, setCategory] = useState<'all' | 'collectible'>('all');
+  const visibleGifts = giftCatalog.filter(gift => (
+    gift.brand === brand && (category === 'all' || gift.collectible)
+  ));
+
+  return <main className="gift-shop" aria-label="Магазин подарков" data-testid="gift-shop">
+    <div className="gift-shop__content">
+      <header className="gift-shop__header">
+        <button type="button" onClick={() => setPath('/settings')} aria-label="Закрыть магазин подарков" data-testid="button-gift-shop-close">
+          <ArrowLeft size={22}/>
+        </button>
+        <h1>Подарки</h1>
+        <span aria-hidden="true"/>
+      </header>
+
+      <div className="gift-shop__balance" aria-label="Баланс звёзд">
+        <span>Баланс</span>
+        <strong><Star size={24} fill="currentColor"/>{walletQuery.data?.balance.toLocaleString('ru-RU') ?? (walletQuery.isLoading ? '…' : '—')}</strong>
+        {walletQuery.isError && <button type="button" onClick={() => void walletQuery.refetch()} data-testid="button-gift-wallet-retry">Повторить</button>}
+      </div>
+
+      <section className="gift-shop__intro">
+        {profileQuery.data
+          ? <Avatar profile={profileQuery.data} size="lg"/>
+          : profileQuery.isError
+            ? <button className="gift-shop__avatar-fallback" type="button" onClick={() => void profileQuery.refetch()} aria-label="Повторить загрузку профиля">
+              <Avatar profile={undefined} size="lg"/>
+              <span>Не удалось загрузить аватар · Повторить</span>
+            </button>
+            : <Avatar profile={undefined} size="lg"/>}
+        <h2>Купить подарок</h2>
+        <p>Подарок можно добавить в профиль или отложить.</p>
+        <p>Редкий подарок можно превратить в коллекционный и затем подарить другому пользователю.</p>
+      </section>
+
+      {walletQuery.isError && <p className="gift-shop__notice" role="alert">Не удалось обновить баланс из кошелька.</p>}
+
+      <div className="gift-shop__brands" role="group" aria-label="Каталог подарков">
+        <button type="button" aria-pressed={brand === 'monogram'} onClick={() => setBrand('monogram')} data-testid="gift-brand-monogram">MonoGram</button>
+        <button type="button" aria-pressed={brand === 'original'} onClick={() => setBrand('original')} data-testid="gift-brand-original">Оригинал</button>
+      </div>
+      <div className="gift-shop__categories" role="group" aria-label="Тип подарка">
+        <button type="button" aria-pressed={category === 'all'} onClick={() => setCategory('all')} data-testid="gift-category-all">Все</button>
+        <button type="button" aria-pressed={category === 'collectible'} onClick={() => setCategory('collectible')} data-testid="gift-category-collectible">Коллекционные</button>
+      </div>
+
+      {visibleGifts.length > 0
+        ? <section className="gift-shop__grid" aria-label="Список подарков">
+            {visibleGifts.map(gift => <article className="gift-shop__card" key={gift.id} data-testid={`gift-${gift.id}`}>
+              <span className="gift-shop__emoji" role="img" aria-label={gift.name}>{gift.emoji}</span>
+              <span className="gift-shop__price"><Star size={23} fill="currentColor"/>{gift.price}</span>
+            </article>)}
+          </section>
+        : <p className="gift-shop__empty">В этой категории пока нет подарков.</p>}
+    </div>
+  </main>;
+}
+
 function AdminStarsPage() {
   const { user } = useAuth();
   const [publicId, setPublicId] = useState('');
@@ -1578,7 +1655,7 @@ function SettingsPage() {
     { label: 'Звёзды MonoGram', description: 'Баланс и история операций', icon: Star, color: '#e6a02f', href: '/stars', value: walletQuery.data ? `${walletQuery.data.balance}` : undefined, testId: 'settings-stars' },
     { label: 'Заработанные GRAM', description: 'Экран начислений', icon: Sparkles, color: '#229dd1', section: 'gram', testId: 'settings-gram' },
     { label: 'Telegram для бизнеса', description: 'Каналы и публикации', icon: BriefcaseBusiness, color: '#df5361', href: '/channels', testId: 'settings-business' },
-    { label: 'Отправить подарок', description: 'Экран подарков', icon: Gift, color: '#e67b35', section: 'gift', testId: 'settings-gift' },
+    { label: 'Отправить подарок', description: 'Магазин подарков', icon: Gift, color: '#e67b35', href: '/gifts', testId: 'settings-gift' },
   ];
   const visibleSettingsRows = settingsRows.filter(item => matches(`${item.label} ${item.description} ${item.value || ''}`));
   const visibleMoneyRows = moneyRows.filter(item => matches(`${item.label} ${item.description} ${item.value || ''}`));
@@ -1815,7 +1892,7 @@ function SettingsPage() {
         content = <section className="mono-settings-feature-screen"><span className="mono-settings-feature-icon"><Sparkles size={25}/></span><h2>Заработанные GRAM</h2><p>Здесь будет отображаться история начислений. Сейчас в MonoGram нет программы начисления GRAM.</p></section>;
         break;
       case 'gift':
-        content = <section className="mono-settings-feature-screen"><span className="mono-settings-feature-icon"><Gift size={25}/></span><h2>Подарки</h2><p>Экран подарков доступен. Каталог и отправка подарков в MonoGram пока не подключены.</p></section>;
+        content = <section className="mono-settings-feature-screen"><span className="mono-settings-feature-icon"><Gift size={25}/></span><h2>Подарки</h2><p>Откройте каталог, чтобы посмотреть доступные подарки.</p><button className="primary-button" type="button" onClick={() => setPath('/gifts')}>Открыть магазин</button></section>;
         break;
       default:
         content = <StateBlock title="Раздел не найден" detail="Вернитесь к списку настроек." action="К настройкам" onAction={() => setPath('/settings')}/>;
@@ -1888,6 +1965,7 @@ function AppRoutes() {
     <Route path="/contacts" component={ContactsPage}/>
     <Route path="/settings" component={SettingsPage}/>
     <Route path="/settings/:section" component={SettingsPage}/>
+    <Route path="/gifts" component={GiftShopPage}/>
     <Route path="/channels" component={ChannelsPage}/>
     <Route path="/channels/:channelId" component={ChannelPage}/>
     <Route path="/profile/edit" component={AccountEditPage}/>
